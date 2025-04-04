@@ -1,0 +1,24 @@
+[project]
+name = "integrattion-layer-airflow"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "apache-airflow>=2.10.5",
+    "apache-airflow-providers-microsoft-azure>=10.5.1",
+    "azure-core>=1.33.0",
+    "azure-storage-blob>=12.25.1",
+    "html2text>=2024.2.26",
+    "msgraph-sdk>=1.26.0",
+    "openai>=1.70.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.3",
+]
+
+[tool.ruff.lint]
+# On top of the default `select` (`E4`, E7`, `E9`, and `F`), enable isort import organisation 
+extend-select = ["I"]
