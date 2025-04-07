@@ -40,4 +40,3 @@ To check the status of deployments it may be helpful to use:
 
 * `helm status airflow`
 * `helm history airflow`
-
