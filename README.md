@@ -10,6 +10,8 @@ The DAGs are synced to the deployed Airflow instance using Git-Sync, with the `m
 
 This codebase uses [uv](https://docs.astral.sh/uv/) as a project and package manager. Install this as per the documentation[here](https://docs.astral.sh/uv/getting-started/installation/).
 
+New dependencies can be added with `uv add <dependency>`, or `uv add --dev <dependency>` for dev dependencies. After updating dependencies the `requirements.txt` file for the deployment should also be updated by running `uv pip compile pyproject.toml -o ./deployment/requirements.txt`
+
 ### Linting
 
 This codebase uses [ruff](https://docs.astral.sh/ruff/) for both linting and code formatting. The easiest way to run it is through uv, and it is specified as a project dependency for this.
@@ -17,9 +19,9 @@ This codebase uses [ruff](https://docs.astral.sh/ruff/) for both linting and cod
 To run ruff over the codebase, run:
 
 ```sh
-uvx ruff check       # Lint all files in the current directory.
-uvx ruff check --fix # Lint all files in the current directory and fix any fixable errors.
-uvx ruff format      # Format all files in the current directory.
+uv run ruff check       # Lint all files in the current directory.
+uv run ruff check --fix # Lint all files in the current directory and fix any fixable errors.
+uv run ruff format      # Format all files in the current directory.
 ```
 
 Ruff can be integrated with your code editor to make it easy to run, see documentation [here](https://docs.astral.sh/ruff/editors/setup/). The relevant VS Code extension is listed as a recommended extension for the repo.
@@ -40,3 +42,101 @@ To check the status of deployments it may be helpful to use:
 
 * `helm status airflow`
 * `helm history airflow`
+## Deploying Airflow to Azure
+
+For the deployed environments we are hosting Airflow on Azure Kubernetes Service, using the [User-Community Airflow Helm Chart](https://github.com/airflow-helm/charts). We have extended the base Docker image to install our own dependencies, and we include our DAGs in the Docker image.
+
+The deployment of the kubernetes cluster, and the creation of secrets are handled in the [infrastructure repo](https://dev.azure.com/DaleBI/DaleSoftwireIntegrationLayer/_git/infrastructure) for the project; this repository is responsible only for the deployment of Airflow onto the cluster.
+
+Prerequisites:
+
+* Helm 3.0+ ([installing helm](https://helm.sh/docs/intro/install/))
+* [Kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+* Azure CLI
+* Docker
+
+### Build Docker Image and Deploy to Azure Container Registry
+
+Our custom Docker image is defined in `Dockerfile`, and builds from the official airflow slim image. The docker image contains our DAG definitions, and therefore must be updated when we update DAGs.
+
+The docker image tag is used to identify the correct image for the airflow deployment- **tags must never be re-used**. For this reason use something unique such as a git hash when tagging builds.
+
+1. Build the image locally
+
+   ```sh
+   docker build . -t pocdalintairflowcontainerregistry.azurecr.io/dalint-airflow-poc:<git-hash>
+   ```
+
+   1. The first part of the image name (before the `:`) is the path to where in ACR we want to save the image
+   2. The second part (after the `:`) is the tag, this is the bit that changes every time and must be unique
+2. Authenticate with the container registry
+
+   ```sh
+   az login
+   az acr login --name pocdalintairflowcontainerregistry
+   ```
+  
+3. Push the docker image to the registry
+
+   ```sh
+   docker push pocdalintairflowcontainerregistry.azurecr.io/dalint-airflow-poc:<git-hash>
+   ```
+
+4. Update the file `deployment/custom-values.yaml` and set the `tag` value to be the tag (i.e. `<git-hash>`) that you used for your image.
+
+### Update Airflow Deployment
+
+All instructions are written to be run from the root of this repo.
+
+1. Login to Azure CLI using `az login` and select the DaleUW directory.
+2. Get credentials for Kubernetes CLI
+
+   ```sh
+   az aks get-credentials --resource-group poc-dalint-k8s-rg --name poc-dalint-k8s-cluster
+   ```
+
+3. Set the `integration-layer-airflow` namespace as default
+
+   ```sh
+   kubectl config set-context --current --namespace=integration-layer-airflow
+   ```
+  
+4. Add the repository to your helm and update repos
+
+   ```sh
+   ## add this helm repository
+   ## [Only needed the first time you do this]
+   helm repo add airflow-stable https://airflow-helm.github.io/charts
+
+   ## update your helm repo cache
+   helm repo update
+   ```
+
+5. Update the airflow release
+
+   ```sh
+   helm upgrade airflow airflow-stable/airflow --values ./deployment/custom-values.yaml
+   ```
+
+To check if everything has worked you may find the following commands useful:
+
+* `helm status airflow` - check the status of the helm deployment
+* `helm history airflow` - check the history of the helm deployment
+* `kubectl describe pod airflow` - check on the actual airflow pod
+
+### Initial Airflow deployment
+
+The first time that Airflow is deployed to AKS, there are a couple of changes required to this flow.
+
+* In step 3 you must create the namespace:
+
+  ```sh
+  kubectl create ns integration-layer-airflow
+  kubectl config set-context --current --namespace=integration-layer-airflow
+  ```
+
+* In step 5 you must install the chart:
+
+  ```sh
+  helm install airflow airflow-stable/airflow --namespace integration-layer-airflow --version "8.X.X" --values ./custom-values.yaml
+  ```
