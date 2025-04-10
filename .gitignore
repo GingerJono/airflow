@@ -1,3 +1,6 @@
 .venv/
 __pycache__
 .ruff_cache/
+
+# Local Running Airflow
+local/

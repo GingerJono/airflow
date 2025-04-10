@@ -26,22 +26,41 @@ uv run ruff format      # Format all files in the current directory.
 
 Ruff can be integrated with your code editor to make it easy to run, see documentation [here](https://docs.astral.sh/ruff/editors/setup/). The relevant VS Code extension is listed as a recommended extension for the repo.
 
-## Developing in Airflow
+### Running Airflow Locally
 
-In order to test DAGs under development it may be desirable to deploy these to the Azure environment for testing, before raising a PR and merging to main. In order to do this the Airflow deployment can be updated in order to point at a different branch - you should ensure your branch is up to date with main, and that no one else is looking to do the same thing.
+During development it can be useful to run airflow locally, in order to test DAGs. A docker-compose file is included in the repo to enable this.
 
-This update has to be done in the terraform repo, but is done by:
+These instructions are based on the Airflow guide [Running Airflow in Docker](https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html)
 
-1. In the `custom-values.yaml` file update the `gitSync.branch` value to the name of your branch
-2. Authenticate with the Kubernetes cluster in your CLI `az aks get-credentials --resource-group poc-dalint-k8s-rg --name poc-dalint-k8s-cluster`
-3. Upgrade the airflow deployment using `helm upgrade airflow airflow-stable/airflow --values ./custom-values.yaml`
+Prerequisites:
 
-See the terraform docs for more information on this, such as prerequisite installations.
+* Install Docker (if using Docker Desktop for Windows you will need a license)
+* Install Docker Compose (note this comes automatically with Docker Desktop)
 
-To check the status of deployments it may be helpful to use:
+1. To initialise the database, run the database migrations and create the first user account.
 
-* `helm status airflow`
-* `helm history airflow`
+  ```sh
+  docker compose up airflow-init
+  ```
+
+1. To run airflow, run `docker compose up`
+1. You will then be able to access the airflow UI at localhost:8080
+   1. The account created by the init step has the login `airflow` and password `airflow`
+
+Changes made to the dags will automatically be picked up, so you can get quick feedback. Logs are saved to the directory `.local/logs`, ensure you run all commands from the root of this repo so the created files are ignored by git.
+
+#### Setting up Connections and Variables
+
+In order to run some DAGs locally you have to manually set up connections and variables from the Airflow UI. This is necessary where we need to connect to an external service (connections) or pass in information to the airflow deployment (variables). You only need to configure these if you wish to run a DAG that requires them, so you may prefer to add as needed.
+
+#### Cleaning up
+
+If your local set up gets messed up you'll likely find the best thing to do is to clean it up and start again - you don't need to do this as part of standard development, just if you run into issues and want to have a clean local slate! To do this, from the root of the repo, run:
+
+```sh
+docker compose down --volumes --remove-orphans
+```
+
 ## Deploying Airflow to Azure
 
 For the deployed environments we are hosting Airflow on Azure Kubernetes Service, using the [User-Community Airflow Helm Chart](https://github.com/airflow-helm/charts). We have extended the base Docker image to install our own dependencies, and we include our DAGs in the Docker image.
