@@ -1,0 +1,376 @@
+########################################
+## CONFIG | Airflow Configs
+########################################
+airflow:
+  ## configs for the airflow container image
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/configuration/airflow-version.md
+  image:
+    repository: pocdalintairflowcontainerregistry.azurecr.io/dalint-airflow-poc
+    tag: "202504101656"
+    
+    ## WARNING: even if set to "Always" DO NOT reuse tag names, 
+    ##          containers only pull the latest image when restarting
+    pullPolicy: IfNotPresent
+
+  ## the airflow executor type to use
+  executor: KubernetesExecutor
+
+  ## the fernet encryption key (sets `AIRFLOW__CORE__FERNET_KEY`)
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/security/set-fernet-key.md
+  ## [WARNING] change from default value to ensure security
+  fernetKey: "XEiAgDDHM-HN4wdVYSAclBCqywHnotYuKrH35FkXoi4="
+
+  ## the secret_key for flask (sets `AIRFLOW__WEBSERVER__SECRET_KEY`)
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/security/set-webserver-secret-key.md
+  ## [WARNING] change from default value to ensure security
+  webserverSecretKey: "DI6LI2gMsgJsxQXbCniYOnLTqWJfJ/pbHDv9QJfddBy1E7DjAnOcAuc8UZYrOawV"
+
+  ## environment variables for airflow configs
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/configuration/airflow-configs.md
+  config:
+    ## security
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "False"
+    
+    ## dags
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    
+    ##
+    AIRFLOW__WEBSERVER__BASE_URL: "/airflow"
+    
+    ## Configure Email logging
+    AIRFLOW__LOGGING__REMOTE_BASE_LOG_FOLDER: "wasb-airflow-logs"
+    AIRFLOW__LOGGING__REMOTE_LOGGING: "True"
+    AIRFLOW__LOGGING__REMOTE_LOG_CONN_ID: "wasb-airflow-logs"
+    AIRFLOW__REMOTE_WASB_LOG_CONTAINER: "wasb-logging"
+    
+    # AIRFLOW__CORE__TEST_CONNECTION: "Enabled"
+    
+  ## a list of users to create
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/security/airflow-users.md
+  users:
+    - username: admin
+      password: admin
+      role: Admin
+      email: admin@example.com
+      firstName: admin
+      lastName: admin
+
+  ## a list airflow connections to create
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-connections.md
+  connections: []
+
+  ## a list airflow variables to create
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-variables.md
+  variables: []
+
+  ## a list airflow pools to create
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-pools.md
+  pools: []
+
+  ## extra pip packages to install in airflow Pods
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/configuration/extra-python-packages.md
+  ## [WARNING] this feature is not recommended for production use, see docs
+  extraPipPackages: []
+
+  ## extra environment variables for the airflow Pods
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-environment-variables.md
+  extraEnv: 
+    - name: AIRFLOW__API__AUTH_BACKENDS
+      value: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    # - name: AIRFLOW__CORE__TEST_CONNECTION
+    #   value: 'True'
+
+  ## extra VolumeMounts for the airflow Pods
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-persistent-volumes.md
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-files.md
+  extraVolumeMounts: []
+
+  ## extra Volumes for the airflow Pods
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-persistent-volumes.md
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-files.md
+  extraVolumes: []
+
+  ## configs generating the `pod_template.yaml` file for `AIRFLOW__KUBERNETES__POD_TEMPLATE_FILE`
+  ## [NOTE] the `dags.gitSync` values will create a git-sync init-container in the pod
+  ## [NOTE] the `airflow.extraPipPackages` will NOT be installed
+  kubernetesPodTemplate:
+
+    ## the full content of the pod-template file (as a string)
+    ## [NOTE] all other `kubernetesPodTemplate.*` are disabled when this is set
+    stringOverride: ""
+
+    ## resource requests/limits for the Pod template "base" container
+    ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.29/#resourcerequirements-v1-core
+    resources: {}
+
+    ## extra pip packages to install in the Pod template
+    ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/configuration/extra-python-packages.md
+    ## [WARNING] this feature is not recommended for production use, see docs
+    extraPipPackages: []
+
+    ## extra VolumeMounts for the Pod template
+    ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-persistent-volumes.md
+    ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-files.md
+    extraVolumeMounts: []
+
+    ## extra Volumes for the Pod template
+    ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-persistent-volumes.md
+    ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/mount-files.md
+    extraVolumes: []
+
+###################################
+## COMPONENT | Airflow Scheduler
+###################################
+scheduler:
+  ## the number of scheduler Pods to run
+  replicas: 1
+
+  ## resource requests/limits for the scheduler Pods
+  ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.29/#resourcerequirements-v1-core
+  resources: {}
+
+  ## configs for the log-cleanup sidecar of the scheduler
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/monitoring/log-cleanup.md
+  logCleanup:
+    enabled: false
+    retentionMinutes: 21600
+
+  ## configs for the scheduler Pods' liveness probe
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/monitoring/scheduler-liveness-probe.md
+  livenessProbe:
+    enabled: true
+
+    ## configs for an additional check that ensures tasks are being created by the scheduler
+    ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/monitoring/scheduler-liveness-probe.md
+    taskCreationCheck:
+      enabled: false
+      thresholdSeconds: 300
+      schedulerAgeBeforeCheck: 180
+
+###################################
+## COMPONENT | Airflow Webserver
+###################################
+web:
+  ## the number of web Pods to run
+  replicas: 1
+
+  ## resource requests/limits for the web Pods
+  ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.29/#resourcerequirements-v1-core
+  resources: {}
+
+  ## configs for the Service of the web Pods
+  service:
+    type: ClusterIP
+    externalPort: 8080
+
+  ## configs generating the `webserver_config.py` file
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/configuration/airflow-configs.md#webserver_configpy
+  webserverConfig:
+    ## the full content of the `webserver_config.py` file (as a string)
+    stringOverride: |
+      from airflow import configuration as conf
+      from flask_appbuilder.security.manager import AUTH_DB
+      
+      # the SQLAlchemy connection string
+      SQLALCHEMY_DATABASE_URI = conf.get("core", "SQL_ALCHEMY_CONN")
+      
+      # use embedded DB for auth
+      AUTH_TYPE = AUTH_DB
+
+    ## the name of a Secret containing a `webserver_config.py` key
+    existingSecret: ""
+
+###################################
+## COMPONENT | Airflow Workers
+###################################
+workers:
+  ## if the airflow workers StatefulSet should be deployed
+  enabled: false
+
+###################################
+## COMPONENT | Triggerer
+###################################
+triggerer:
+  ## if the airflow triggerer should be deployed
+  enabled: true
+
+  ## the number of triggerer Pods to run
+  replicas: 1
+
+  ## resource requests/limits for the triggerer Pods
+  ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.29/#resourcerequirements-v1-core
+  resources: {}
+
+  ## maximum number of triggers each triggerer will run at once (sets `AIRFLOW__TRIGGERER__DEFAULT_CAPACITY`)
+  capacity: 1000
+
+###################################
+## COMPONENT | Flower
+###################################
+flower:
+  ## if the airflow flower UI should be deployed
+  enabled: false
+
+###################################
+## CONFIG | Airflow Logs
+###################################
+logs:
+  ## the airflow logs folder
+  path: /opt/airflow/logs
+
+  ## configs for the logs PVC
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/monitoring/log-persistence.md
+  persistence:
+    enabled: false
+
+###################################
+## CONFIG | Airflow DAGs
+###################################
+dags:
+  ## the airflow dags folder
+  path: /opt/airflow/dags
+
+  ## configs for the dags PVC
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/load-dag-definitions.md
+  persistence:
+    enabled: false
+
+  ## configs for the git-sync sidecar
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/load-dag-definitions.md
+  gitSync:
+    enabled: false
+    
+    repoHost: "azure.com"
+    
+    repo: git@ssh.dev.azure.com:v3/DaleBI/DaleSoftwireIntegrationLayer/airflow
+    branch: 89-email-integration-migration
+    revision: HEAD
+    
+    ## the sub-path within your repo where dags are located
+    ## NOTE: airflow will only see dags under this path, but the whole repo will still be synced
+    repoSubPath: "/dags"
+    
+    ## number of seconds to wait between syncs
+    ## NOTE: also sets `AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL` unless overwritten in `airflow.config`
+    syncWait: 60
+    
+    ## the max number of seconds allowed for a complete sync
+    ## NOTE: if your repo takes a very long time to sync, you may need to increase this value
+    syncTimeout: 120
+    
+    ## the number of consecutive failures allowed before aborting
+    ## NOTE: if your repo regularly has intermittent failures, you may wish to set a non-0 value
+    maxFailures: 0
+    
+    sshSecret: "airflow-ssh-git-secret"
+    sshSecretKey: "id_rsa"
+    
+    ## NOTE: "known_hosts" verification can be disabled by setting to "" 
+    sshKnownHosts: |-
+      ssh.dev.azure.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7Hr1oTWqNqOlzGJOfGJ4NakVyIzf1rXYd4d7wo6jBlkLvCA4odBlL0mDUyZ0/QUfTTqeu+tm22gOsv+VrVTMk6vwRU75gY/y9ut5Mb3bR5BV58dKXyq9A9UeB5Cakehn5Zgm6x1mKoVyf+FFn26iYqXJRgzIZZcZ5V6hrE0Qg39kZm4az48o0AUbf6Sp4SLdvnuMa2sVNwHBboS7EJkm57XQPVU3/QpyNLHbWDdzwtrlS+ez30S3AdYhLKEOxAG8weOnyrtLJAUen9mTkol8oII1edf7mWWbWVf0nBmly21+nZcmCTISQBtdcyPaEno7fFQMDD26/s0lfKob4Kw8H
+
+###################################
+## CONFIG | Kubernetes Ingress
+###################################
+ingress:
+  ## if we should deploy Ingress resources
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/ingress.md
+  enabled: true
+  
+  apiVersion: networking.k8s.io/v1
+  
+  # airflow webserver ingress configs
+  web:
+    annotations: {}
+    # host: "example.com"
+    path: "/airflow"
+    ## WARNING: requires Kubernetes 1.18 or later, use "kubernetes.io/ingress.class" annotation for older versions
+    ingressClassName: "nginx"
+    
+    rules:
+    - http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: airflow-web
+              port:
+                number: 8080
+
+
+
+###################################
+## CONFIG | Kubernetes ServiceAccount
+###################################
+serviceAccount:
+  ## if a Kubernetes ServiceAccount is created
+  create: true
+
+  ## the name of the ServiceAccount
+  name: "airflow"
+
+  ## annotations for the ServiceAccount
+  annotations: {}
+
+###################################
+## CONFIG | Kubernetes Extra Manifests
+###################################
+
+## a list of extra Kubernetes manifests that will be deployed alongside the chart
+## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/kubernetes/extra-manifests.md
+extraManifests: []
+
+###################################
+## DATABASE | PgBouncer
+###################################
+pgbouncer:
+  ## if the pgbouncer Deployment is created
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/database/pgbouncer.md
+  enabled: true
+
+  ## resource requests/limits for the pgbouncer Pods
+  ## [SPEC] https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.29/#resourcerequirements-v1-core
+  resources: {}
+
+  ## sets pgbouncer config: `auth_type`
+  authType: md5
+
+###################################
+## DATABASE | Embedded Postgres
+###################################
+postgresql:
+  ## if the `stable/postgresql` chart is used
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/database/embedded-database.md
+  ## [WARNING] the embedded Postgres is NOT SUITABLE for production deployments of Airflow
+  ## [WARNING] consider using an external database with `externalDatabase.*`
+  enabled: true
+
+  ## configs for the PVC of postgresql
+  persistence:
+    enabled: true
+    storageClass: ""
+    size: 8Gi
+
+###################################
+## DATABASE | External Database
+###################################
+externalDatabase:
+  ## the type of external database
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/database/external-database.md
+  type: postgres
+
+###################################
+## DATABASE | Embedded Redis
+###################################
+redis:
+  ## if the `stable/redis` chart is used
+  enabled: false
+
+###################################
+## DATABASE | External Redis
+###################################
+externalRedis:
+  ## the host of the external redis
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/database/external-redis.md
+  host: localhost

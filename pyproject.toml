@@ -1,0 +1,26 @@
+[project]
+name = "integration-layer-airflow"
+version = "0.1.0"
+description = "This project defines the airflow instance for the Dale Integration layer."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "apache-airflow-providers-microsoft-azure==12.2.2",
+    "anyio==4.8.0",
+    "httpx==0.27.0",
+    "html2text>=2024.2.26",
+    "openai==1.70.0",
+    "apache-airflow-providers-celery==3.10.5",
+]
+
+[dependency-groups]
+dev = [
+    "apache-airflow>=2.10.5",
+    "azure-core>=1.33.0",
+    "azure-storage-blob>=12.25.1",
+    "ruff>=0.11.3",
+]
+
+[tool.ruff.lint]
+# On top of the default `select` (`E4`, E7`, `E9`, and `F`), enable isort import organisation 
+extend-select = ["I"]
