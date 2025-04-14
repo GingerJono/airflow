@@ -1,7 +1,7 @@
 [project]
 name = "integration-layer-airflow"
 version = "0.1.0"
-description = "Add your description here"
+description = "This project defines the airflow instance for the Dale Integration layer."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
