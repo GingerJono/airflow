@@ -157,5 +157,5 @@ The first time that Airflow is deployed to AKS, there are a couple of changes re
 * In step 5 you must install the chart:
 
   ```sh
-  helm install airflow airflow-stable/airflow --namespace integration-layer-airflow --version "8.X.X" --values ./custom-values.yaml
+  helm install airflow airflow-stable/airflow --namespace integration-layer-airflow --version "8.X.X" --values ./deployment/custom-values.yaml
   ```
