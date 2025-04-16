@@ -29,9 +29,9 @@ def check_subscription_properties(subscription: dict) -> bool:
         "email_monitoring_apim_lifecycle_notification_url"
     )
     return (
-        subscription["clientState"] == client_state,
-        subscription["notificationUrl"] == change_notification_url,
-        subscription["lifecycleNotificationUrl"] == lifecycle_notification_url,
+        subscription["clientState"] == client_state
+        and subscription["notificationUrl"] == change_notification_url
+        and subscription["lifecycleNotificationUrl"] == lifecycle_notification_url,
     )
 
 
