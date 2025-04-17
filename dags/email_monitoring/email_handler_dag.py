@@ -95,7 +95,7 @@ def process_email_change_notifications():
         plain text, before being saved to the storage account for the
         next task.
         """
-        logger.info(f"Getting LLM response for {email_id}")
+        logger.info("Parsing email with id %s", email_id)
 
         run_id = dag_run.run_id
 
@@ -131,9 +131,16 @@ def process_email_change_notifications():
             case "html":
                 parsed_email_content = html2text(email_body_content)
             case _:
-                logger.error("Unexpected email body type", email_body_content_type)
+                logger.error(
+                    "Unexpected email body type %s for email with id %s",
+                    email_body_content_type,
+                    email_id,
+                )
                 raise Exception("Unexpected email content type")
 
+        logger.info(
+            "Email content successfully parsed, writing parsed content to storage."
+        )
         write_string_to_file(
             container_name=BLOB_CONTAINER,
             blob_name=f"{run_id}/{email_id}/{EMAIL_BODY_FILENAME}",
@@ -149,7 +156,7 @@ def process_email_change_notifications():
 
         This task passes the email contents to an LLM for enrichment. It saves the response to blob storage.
         """
-        logger.info(f"Getting LLM response for {email_id}")
+        logger.info("Getting LLM response for %s", email_id)
 
         run_id = dag_run.run_id
 
