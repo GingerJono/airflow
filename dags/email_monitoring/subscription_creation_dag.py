@@ -1,71 +1,22 @@
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
 from airflow.models import Variable
 from airflow.operators.empty import EmptyOperator
-from airflow.providers.microsoft.azure.operators.msgraph import MSGraphAsyncOperator
 from airflow.utils.edgemodifier import Label
+from utilities.email_subscription_helper import (
+    create_mailbox_subscription,
+    get_existing_subscriptions,
+)
 
-NUM_RETRIES = 0
+NUM_RETRIES = 2
 RETRY_DELAY_MINS = 3
 
 MSGRAPH_CONNECTION_ID = "microsoft_graph"
 
-SUBSCRIPTION_DURATION_MIN = 8 * 60
 
 logger = logging.getLogger(__name__)
-
-
-def check_subscription_properties(subscription: dict) -> bool:
-    """
-    Checks if an MSGraph subscription has details matching those
-    desired.
-    """
-    client_state = Variable.get("email_monitoring_client_state")
-    change_notification_url = Variable.get(
-        "email_monitoring_apim_change_notification_url"
-    )
-    lifecycle_notification_url = Variable.get(
-        "email_monitoring_apim_lifecycle_notification_url"
-    )
-    return (
-        subscription["clientState"] == client_state
-        and subscription["notificationUrl"] == change_notification_url
-        and subscription["lifecycleNotificationUrl"] == lifecycle_notification_url,
-    )
-
-
-def process_msgraph_subscription_response(context, result) -> bool:
-    """
-    Processes response from retrieving MSGraph subscription details,
-     and returns boolean value indicating if a subscription exists.
-
-    Returns:
-        bool: Boolean indicating if there is an existing subscription
-
-    """
-    logger.info("Processing MS Graph response to confirm subscription existence.")
-    if len(result["value"]) == 0:
-        logger.info("No subscription exists.")
-        return False
-
-    subscriptions = result["value"]
-
-    logger.debug("Subscriptions recieved %s", result["value"])
-
-    subscriptions = [
-        subscription
-        for subscription in subscriptions
-        if check_subscription_properties(subscription)
-    ]
-
-    if len(subscriptions) > 0:
-        logger.info("Subscription with desired properties already exists.")
-        return True
-    else:
-        logger.info("No subscription with desired properties exists.")
-        return False
 
 
 @dag(
@@ -84,46 +35,43 @@ def subscribe_to_mailbox():
     ### Subscribe to Mailbox
 
     This DAG is used to set up the subscription to an MS Graph Mailbox.
-    It runs on a schedule, and if the subscription does not already exist will create it.
+
+    It runs on a schedule, and if the subscription does not already exist will
+    create it.
     """
 
-    subscription_existence_task = MSGraphAsyncOperator(
-        task_id="check_subscription_exists",
-        conn_id=MSGRAPH_CONNECTION_ID,
-        url="subscriptions",
-        result_processor=process_msgraph_subscription_response,
-    )
+    @task
+    def check_subscription_exists() -> bool:
+        """
+        Check for existing subscription with the desired properties.
 
-    mailbox = Variable.get("email_monitoring_mailbox")
-    client_state = Variable.get("email_monitoring_client_state")
-    change_notification_url = Variable.get(
-        "email_monitoring_apim_change_notification_url"
-    )
-    lifecycle_notification_url = Variable.get(
-        "email_monitoring_apim_lifecycle_notification_url"
-    )
-    subscription_duration = timedelta(minutes=SUBSCRIPTION_DURATION_MIN)
-
-    subscription_creation_task = MSGraphAsyncOperator(
-        task_id="subscribe_to_mailbox",
-        conn_id=MSGRAPH_CONNECTION_ID,
-        url="subscriptions",
-        method="POST",
-        data={
-            "changeType": "created",
-            "resource": f"/users/{mailbox}/mailFolders('Inbox')/messages",
-            "expirationDateTime": (
-                datetime.now(UTC) + subscription_duration
-            ).isoformat(),
-            "notificationUrl": change_notification_url,
-            "lifecycleNotificationUrl": lifecycle_notification_url,
-            "clientState": client_state,
-            "includeResourceData": False,
-        },
-    )
+        Returns:
+            bool: True if there is an existing subscription with the desired properties,
+                  False otherwise.
+        """
+        mailbox = Variable.get("email_monitoring_mailbox")
+        subscriptions = get_existing_subscriptions(mailbox)
+        if subscriptions and len(subscriptions) > 0:
+            logger.info("Subscription with desired properties already exists.")
+            return True
+        else:
+            logger.info("No subscription with desired properties exists.")
+            return False
 
     @task.branch
-    def branch(subscription_exists: bool):
+    def branch(subscription_exists: bool) -> str:
+        """
+        A branching task, which returns the id of the task which should run next,
+        based on whether or not a subscription with the desired properties already
+        exists.
+
+        Args:
+            subscription_exists (bool): Boolean value indicating whether there is
+                                        an existing subscription
+
+        Returns:
+            str: The task id of the the next task which should run
+        """
         if subscription_exists:
             logger.info("Subscription exists, no action required.")
             return "end"
@@ -133,17 +81,25 @@ def subscribe_to_mailbox():
             )
             return "subscribe_to_mailbox"
 
+    @task
+    def subscribe_to_mailbox():
+        """
+        Creates MS Graph subscription to the mailbox, with the configured change
+        and lifecycle notication URLs.
+        """
+        mailbox = Variable.get("email_monitoring_mailbox")
+
+        create_mailbox_subscription(mailbox=mailbox)
+
     end = EmptyOperator(task_id="end", trigger_rule="none_failed_min_one_success")
 
-    subscription_exists = subscription_existence_task.output
-
-    branch_instance = branch(subscription_exists)
+    branch_instance = branch(check_subscription_exists())
 
     branch_instance >> Label("Subscription exists") >> end
     (
         branch_instance
         >> Label("Subscription does not exist")
-        >> subscription_creation_task
+        >> subscribe_to_mailbox()
         >> end
     )
 

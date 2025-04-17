@@ -8,20 +8,17 @@ from airflow.models import Variable
 from airflow.models.dagrun import DagRun
 from airflow.models.param import Param
 from airflow.operators.empty import EmptyOperator
-from airflow.providers.microsoft.azure.operators.msgraph import MSGraphAsyncOperator
 from html2text import html2text
 from utilities.blob_storage_helper import (
     read_file_as_string,
     write_string_to_file,
 )
-from utilities.msgraph_helper import send_email
+from utilities.msgraph_helper import get_email_from_id, send_email
 from utilities.open_ai_helper import get_llm_chat_response
 
-NUM_RETRIES = 0
+NUM_RETRIES = 2
 RETRY_DELAY_MINS = 3
 
-
-MSGRAPH_CONNECTION_ID = "microsoft_graph"
 
 BLOB_CONTAINER = "email-monitoring-data"
 
@@ -31,20 +28,6 @@ LLM_RESPONSE_FILENAME = "llm_response"
 EMAIL_RESPONSE_FILENAME = "email_response"
 
 logger = logging.getLogger(__name__)
-
-
-def save_email_content_to_blob_storage(context, result):
-    logger.info("Saving email content to blob storage...")
-    run_id = context["dag_run"].run_id
-
-    email_id = result["id"]
-
-    blob_path = f"{run_id}/{email_id}/{GRAPH_RESPONSE_FILENAME}"
-
-    write_string_to_file(BLOB_CONTAINER, blob_path, json.dumps(result))
-
-    logger.info("Email content saved to blob storage: %s", blob_path)
-    return email_id
 
 
 @dag(
@@ -67,25 +50,48 @@ def process_email_change_notifications():
 
     @task
     def get_email_ids(params: dict) -> [str]:
+        """
+        Gets the list of email ids from the DAG parameters
+
+        Returns:
+            [str]: Array of email ids that need handling
+        """
         email_ids = params["email_ids"]
         if not email_ids:
             raise AirflowFailException("No email IDs provided")
         return email_ids
 
     @task
-    def get_graph_email_url(email_id: str) -> str:
-        mailbox = Variable.get("email_monitoring_mailbox")
+    def get_email_content(email_id: str, dag_run: DagRun | None = None) -> str:
+        """
+        Retrieves the content of an email from MS Graph, and saves the raw response
+        to Azure Blob Storage.
 
-        url = f"users/{mailbox}/messages/{email_id}"
-        logger.info(f"Received {email_id}, returning {url}")
-        return url
+        Args:
+            email_id (str): The id of the email to retrieve from MS Graph
+
+        Returns:
+            str: The id of the email, always matches email_id argument passed in.
+        """
+        logger.info("Retrieving email with id %s", email_id)
+
+        mailbox = Variable.get("email_monitoring_mailbox")
+        result = get_email_from_id(email_id=email_id, mailbox=mailbox)
+
+        logger.info("Saving email content to blob storage...")
+        run_id = dag_run.run_id
+
+        blob_path = f"{run_id}/{email_id}/{GRAPH_RESPONSE_FILENAME}"
+
+        write_string_to_file(BLOB_CONTAINER, blob_path, json.dumps(result))
+
+        logger.info("Email content saved to blob storage: %s", blob_path)
+        return email_id
 
     @task.branch
     def check_and_parse_email(email_id: str, dag_run: DagRun | None = None):
         """
-        #### Check and Parse Email task
-
-        This task reviews the MSGraph response containing the email.
+        Processes the MSGraph response containing the email.
 
         If the email was received from the mailbox which is monitored
         then no futher processing should be done, as this may an email
@@ -94,6 +100,9 @@ def process_email_change_notifications():
         Otherwise, the body of the email is retrieved and processed to
         plain text, before being saved to the storage account for the
         next task.
+
+        Args:
+            email_id (str): The id of the email to retrieve from MS Graph
         """
         logger.info("Parsing email with id %s", email_id)
 
@@ -104,7 +113,6 @@ def process_email_change_notifications():
             blob_name=f"{run_id}/{email_id}/{GRAPH_RESPONSE_FILENAME}",
         )
 
-        logger.info("Got msgraph response")
         logger.debug(msgraph_response)
 
         msgraph_response = json.loads(msgraph_response)
@@ -152,9 +160,10 @@ def process_email_change_notifications():
     @task
     def get_llm_response(email_id: str, dag_run: DagRun | None = None):
         """
-        #### Get LLM Response task
+        Passes email contents to an LLM for enrichment, then saves the response to blob storage.
 
-        This task passes the email contents to an LLM for enrichment. It saves the response to blob storage.
+        Args:
+            email_id (str): The id of the email to retrieve from MS Graph
         """
         logger.info("Getting LLM response for %s", email_id)
 
@@ -213,9 +222,11 @@ def process_email_change_notifications():
     @task
     def send_email_to_inbox(email_object_path: str):
         """
-        #### Send Email task
+        Sends an email back to the inbox with the LLM enriched version of the email.
 
-        This task sends an email back to the inbox with the LLM enriched version of the email.
+        Args:
+            email_object_path (str): The path to the blob containing details
+                                     of the email to be sent
         """
         logging.info("Sending LLM enriched email")
         email_details = json.loads(
@@ -236,20 +247,12 @@ def process_email_change_notifications():
         return
 
     email_ids = get_email_ids()
-    email_urls = get_graph_email_url.expand(email_id=email_ids)
-
-    get_email_task = MSGraphAsyncOperator.partial(
-        task_id="get_email",
-        conn_id=MSGRAPH_CONNECTION_ID,
-        result_processor=save_email_content_to_blob_storage,
-    ).expand(url=email_urls)
 
     parse_email_task_instance = check_and_parse_email.expand(email_id=email_ids)
 
-    get_email_task >> parse_email_task_instance
     email_object_paths = get_llm_response.expand(email_id=email_ids)
 
-    (parse_email_task_instance >> email_object_paths)
+    parse_email_task_instance >> email_object_paths
 
     send_email_to_inbox.expand(email_object_path=email_object_paths)
 
