@@ -51,7 +51,17 @@ Changes made to the dags will automatically be picked up, so you can get quick f
 
 #### Setting up Connections and Variables
 
-In order to run some DAGs locally you have to manually set up connections and variables from the Airflow UI. This is necessary where we need to connect to an external service (connections) or pass in information to the airflow deployment (variables). You only need to configure these if you wish to run a DAG that requires them, so you may prefer to add as needed.
+Variables in the local environment are configured through the `development.env` file.
+
+1. Duplicate the `development.env template` file and rename to `development.env`
+2. Fill in the missing (sensitive) values
+
+Note that variables defined through environment variables are not visible in the airflow UI, so don't worry if you look and can't see them there! This does unfortunately mean that the only way to confirm that they have been set properly is to try running a DAG that uses them.
+
+Connections must be set up manually through the UI. There are two connections that may be required for local development testing:
+
+- `microsoft_graph`: connection to Microsoft Graph, using for interacting with the subscription for the email monitoring DAGs
+- `wasb`: connection to Azure Blob Storage, used for saving data between tasks.
 
 #### Cleaning up
 

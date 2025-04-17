@@ -4,4 +4,4 @@ __pycache__
 
 # Local Running Airflow
 local/
-.env
+development.env

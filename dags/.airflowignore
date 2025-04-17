@@ -1,1 +1,7 @@
+# In order to use functions defined in other code files in DAGs those files 
+# need to be in the /dags folder. This file specifies directories/files in
+# the dag folder which Airflow should intentionally ignore when scanning 
+# for DAGs. All helper/utility function files should be kept under paths 
+# defined in this file, to improve performance.
+
 utilities/
