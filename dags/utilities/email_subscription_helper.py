@@ -8,7 +8,6 @@ from utilities.msgraph_helper import (
 )
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 SUBSCRIPTION_DURATION_MIN = 8 * 60
 

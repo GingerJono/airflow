@@ -7,7 +7,6 @@ from airflow.providers.microsoft.azure.hooks.msgraph import (
 )
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 MSGRAPH_CONNECTION_ID = "microsoft_graph"
 
