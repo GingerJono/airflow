@@ -6,7 +6,7 @@ airflow:
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/configuration/airflow-version.md
   image:
     repository: pocdalintairflowcontainerregistry.azurecr.io/dalint-airflow-poc
-    tag: "03e58452882426f65da7e387f76272a8592f83a9"
+    tag: "f3346deca9bf6a3a11927aed3225d7379491cc39"
     
     ## WARNING: even if set to "Always" DO NOT reuse tag names, 
     ##          containers only pull the latest image when restarting
