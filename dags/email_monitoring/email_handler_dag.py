@@ -49,12 +49,12 @@ def process_email_change_notifications():
     """
 
     @task
-    def get_email_ids(params: dict) -> [str]:
+    def get_email_ids(params: dict) -> list[str]:
         """
         Gets the list of email ids from the DAG parameters
 
         Returns:
-            [str]: Array of email ids that need handling
+            lists[str]: Array of email ids that need handling
         """
         email_ids = params["email_ids"]
         if not email_ids:
@@ -248,11 +248,13 @@ def process_email_change_notifications():
 
     email_ids = get_email_ids()
 
+    email_content_task_instance = get_email_content.expand(email_id=email_ids)
+
     parse_email_task_instance = check_and_parse_email.expand(email_id=email_ids)
 
     email_object_paths = get_llm_response.expand(email_id=email_ids)
 
-    parse_email_task_instance >> email_object_paths
+    email_content_task_instance >> parse_email_task_instance >> email_object_paths
 
     send_email_to_inbox.expand(email_object_path=email_object_paths)
 

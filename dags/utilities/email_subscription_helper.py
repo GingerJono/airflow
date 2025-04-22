@@ -53,7 +53,7 @@ def check_subscription_properties(subscription: dict) -> bool:
     return subscription_has_desired_properties
 
 
-def get_existing_subscriptions(mailbox: str) -> [object]:
+def get_existing_subscriptions(mailbox: str) -> list[object]:
     logger.info("Checking for existing subscriptions for mailbox %s", mailbox)
 
     result = get_mailbox_subscriptions(mailbox)

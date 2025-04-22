@@ -43,14 +43,14 @@ def process_lifecycle_notifications():
     """
 
     @task
-    def check_params(params: dict) -> [dict[str, str]]:
+    def check_params(params: dict) -> list[dict[str, str]]:
         """
         Checks parameters passed to the DAG.
 
         Raises an error if required parameters not provided.
 
         Returns:
-            [dict[str, str]]: The notifications parameter passed to the DAG
+            list[dict[str, str]]: The notifications parameter passed to the DAG
         """
         notifications = params["notifications"]
         if not notifications:
