@@ -169,3 +169,30 @@ The first time that Airflow is deployed to AKS, there are a couple of changes re
   ```sh
   helm install airflow airflow-stable/airflow --namespace integration-layer-airflow --version "8.X.X" --values ./deployment/custom-values.yaml
   ```
+
+## Variables and Connections
+
+There are a number of variables and connections which must be configured in Airflow for the DAGs to work. At present these must be set manually in the UI, though in future we should update this so they are created through the custom-values.yaml file, pulling values from Kubernetes Secrets and ConfigMaps.
+
+### Variables
+
+Variables are set in the UI at Admin > Variables
+
+| Variable Name                                    | Value                                                                                                                                      | Purpose                                                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| azureai_api_key                                  | Value from key vault secret `email-monitoring-openai-api-key`                                                                              | API Key for interacting with Azure Open AI client                                                     |
+| azureai_endpoint                                 | `https://common-dalint-openai.openai.azure.com/openai/deployments/common-dalint-openai-deployment/chat/completions?api-version=2024-10-21` | URL for requests to Azure Open AI.                                                                    |
+| email_monitoring_apim_change_notification_url    | `https://common-dalint-apim.azure-api.net/dalint-internal/api/v1/email-monitoring/notification`                                            | Endpoint for email change notifications to be sent to.                                                |
+| email_monitoring_apim_lifecycle_notification_url | `https://common-dalint-apim.azure-api.net/dalint-internal/api/v1/email-monitoring/lifecycle-notification`                                  | Email for lifecycle notifications to be sent to.                                                      |
+| email_monitoring_client_state                    | Value from key vault secret `email-monitoring-client-secret`                                                                               | Client secret for service principal used to authenticate with Microsoft Graph for email subscription. |
+| email_monitoring_mailbox                         | `autosubs@daleuw.com`                                                                                                                      | The mailbox which is being monitored for submissions.                                                 |
+
+### Connections
+
+Connections are set in the UI at Admin > Connections
+
+| Connection Name   | Connection Type                 | Configuration                                                                                                                                                                                                                                                      | Purpose                                                                                |
+| ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| microsoft_graph   | `msgraph` (Microsoft Graph API) | Client ID: From key vault secret `email-monitoring-client-id`</br>Client Secret: From key vault secret `email-monitoring-client-secret`</br>Tenant ID: cd4ffd59-5c74-4b7a-b992-9fc58efba60c</br>API Version: v1.0</br>Scopes: https://graph.microsoft.com/.default | Connection to Microsoft Graph, used for requests relating to the mailbox subscription. |
+| wasb              | `wasb` (Azure Blob Storage)     | SAS Token: Set to blob serve SAS URL for a generated SAS token for the blob storage account. (Note this will need to be updated regularly when it expires, until we move to using a service principal for this authentication)                                     | Connection to Azure Blob storage, used for saving data to blobs to pass between tags.  |
+| wasb-airflow-logs | `wasb` (Azure Blob Storage)     | Same as wasb connection                                                                                                                                                                                                                                            | Connection to Azure Blob storage, used for reading and writing logs from/to blobs.     |
