@@ -49,12 +49,86 @@ airflow:
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/security/airflow-users.md
   users:
     - username: admin
-      password: admin
+      password: ${ADMIN_PASSWORD}
       role: Admin
       email: admin@example.com
       firstName: admin
       lastName: admin
-
+    
+    - username: jon-oneill
+      password: ${JONO_PASSWORD}
+      role: User
+      email: jononeill@daleuw.com
+      firstName: Jon
+      lastName: "O'Neill"
+    
+    - username: becky-carter
+      password: ${BECKY_PASSWORD}
+      role: 
+       - User
+       - Op
+      email: becky.carter@softwire.com
+      firstName: Becky
+      lastName: Carter
+      
+    - username: simon-stjohngreen
+      password: ${SIMON_PASSWORD}
+      role: 
+       - User
+       - Op
+      email: simon.stjohn-green@softwire.com
+      firstName: Simon
+      lastName: "St John-Green"
+      
+    - username: matthew-english
+      password: ${MATTHEW_PASSWORD}
+      role: 
+       - User
+       - Op
+      email: matthew.english@softwire.com
+      firstName: Matthew
+      lastName: English
+      
+    - username: conor-bleakley
+      password: ${CONOR_PASSWORD}
+      role: 
+       - User
+       - Op
+      email: conor.bleakley@softwire.com
+      firstName: Conor
+      lastName: Bleakley
+  
+  usersTemplates:
+    ADMIN_PASSWORD:
+      kind: secret
+      name: airflow-admin-user-details
+      key: password
+    
+    JONO_PASSWORD:
+      kind: secret
+      name: jon-oneil-user-details
+      key: password
+    
+    BECKY_PASSWORD:
+      kind: secret
+      name: becky-carter-user-details
+      key: password
+    
+    SIMON_PASSWORD:
+      kind: secret
+      name: simon-stjohngreen-user-details
+      key: password
+    
+    MATTHEW_PASSWORD:
+      kind: secret
+      name: matthew-english-user-details
+      key: password
+    
+    CONOR_PASSWORD:
+      kind: secret
+      name: conor-bleakley-user-details
+      key: password
+      
   ## a list airflow connections to create
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-connections.md
   connections: []
