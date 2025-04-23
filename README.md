@@ -51,7 +51,17 @@ Changes made to the dags will automatically be picked up, so you can get quick f
 
 #### Setting up Connections and Variables
 
-In order to run some DAGs locally you have to manually set up connections and variables from the Airflow UI. This is necessary where we need to connect to an external service (connections) or pass in information to the airflow deployment (variables). You only need to configure these if you wish to run a DAG that requires them, so you may prefer to add as needed.
+Variables in the local environment are configured through the `development.env` file.
+
+1. Duplicate the `development.env template` file and rename to `development.env`
+2. Fill in the missing (sensitive) values
+
+Note that variables defined through environment variables are not visible in the airflow UI, so don't worry if you look and can't see them there! This does unfortunately mean that the only way to confirm that they have been set properly is to try running a DAG that uses them.
+
+Connections must be set up manually through the UI. There are two connections that may be required for local development testing:
+
+- `microsoft_graph`: connection to Microsoft Graph, using for interacting with the subscription for the email monitoring DAGs
+- `wasb`: connection to Azure Blob Storage, used for saving data between tasks.
 
 #### Cleaning up
 
@@ -157,5 +167,32 @@ The first time that Airflow is deployed to AKS, there are a couple of changes re
 * In step 5 you must install the chart:
 
   ```sh
-  helm install airflow airflow-stable/airflow --namespace integration-layer-airflow --version "8.X.X" --values ./custom-values.yaml
+  helm install airflow airflow-stable/airflow --namespace integration-layer-airflow --version "8.X.X" --values ./deployment/custom-values.yaml
   ```
+
+## Variables and Connections
+
+There are a number of variables and connections which must be configured in Airflow for the DAGs to work. At present these must be set manually in the UI, though in future we should update this so they are created through the custom-values.yaml file, pulling values from Kubernetes Secrets and ConfigMaps.
+
+### Variables
+
+Variables are set in the UI at Admin > Variables
+
+| Variable Name                                    | Value                                                                                                                                      | Purpose                                                                                               |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| azureai_api_key                                  | Value from key vault secret `email-monitoring-openai-api-key`                                                                              | API Key for interacting with Azure Open AI client                                                     |
+| azureai_endpoint                                 | `https://common-dalint-openai.openai.azure.com/openai/deployments/common-dalint-openai-deployment/chat/completions?api-version=2024-10-21` | URL for requests to Azure Open AI.                                                                    |
+| email_monitoring_apim_change_notification_url    | `https://common-dalint-apim.azure-api.net/dalint-internal/api/v1/email-monitoring/notification`                                            | Endpoint for email change notifications to be sent to.                                                |
+| email_monitoring_apim_lifecycle_notification_url | `https://common-dalint-apim.azure-api.net/dalint-internal/api/v1/email-monitoring/lifecycle-notification`                                  | Email for lifecycle notifications to be sent to.                                                      |
+| email_monitoring_client_state                    | Value from key vault secret `email-monitoring-client-secret`                                                                               | Client secret for service principal used to authenticate with Microsoft Graph for email subscription. |
+| email_monitoring_mailbox                         | `autosubs@daleuw.com`                                                                                                                      | The mailbox which is being monitored for submissions.                                                 |
+
+### Connections
+
+Connections are set in the UI at Admin > Connections
+
+| Connection Name   | Connection Type                 | Configuration                                                                                                                                                                                                                                                      | Purpose                                                                                |
+| ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| microsoft_graph   | `msgraph` (Microsoft Graph API) | Client ID: From key vault secret `email-monitoring-client-id`</br>Client Secret: From key vault secret `email-monitoring-client-secret`</br>Tenant ID: cd4ffd59-5c74-4b7a-b992-9fc58efba60c</br>API Version: v1.0</br>Scopes: https://graph.microsoft.com/.default | Connection to Microsoft Graph, used for requests relating to the mailbox subscription. |
+| wasb              | `wasb` (Azure Blob Storage)     | SAS Token: Set to blob serve SAS URL for a generated SAS token for the blob storage account. (Note this will need to be updated regularly when it expires, until we move to using a service principal for this authentication)                                     | Connection to Azure Blob storage, used for saving data to blobs to pass between tags.  |
+| wasb-airflow-logs | `wasb` (Azure Blob Storage)     | Same as wasb connection                                                                                                                                                                                                                                            | Connection to Azure Blob storage, used for reading and writing logs from/to blobs.     |
