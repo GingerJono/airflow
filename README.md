@@ -148,10 +148,10 @@ All instructions are written to be run from the root of this repo.
    ```sh
    helm upgrade airflow airflow-stable/airflow --values ./deployment/custom-values.yaml
    ```
-   
-   - Before doing this is may be sensible to confirm the currently kubectl context,
+
+   * Before doing this is may be sensible to confirm the currently kubectl context,
    which determines the environment this affects. This can be done using the command `kubectl config current-context`.
-   - You can use `kubectl config view` to see all available contexts, and `kubectl config use-context` to set the context
+   * You can use `kubectl config view` to see all available contexts, and `kubectl config use-context` to set the context
 
 To check if everything has worked you may find the following commands useful:
 
@@ -188,8 +188,8 @@ Variables are set in the UI at Admin > Variables
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
 | azureai_api_key                                  | Value from key vault secret `email-monitoring-openai-api-key`                                                                              | API Key for interacting with Azure Open AI client                                                     |
 | azureai_endpoint                                 | `https://common-dalint-openai.openai.azure.com/openai/deployments/common-dalint-openai-deployment/chat/completions?api-version=2024-10-21` | URL for requests to Azure Open AI.                                                                    |
-| email_monitoring_apim_change_notification_url    | `https://common-dalint-api-management.azure-api.net/dalint-internal/api/v1/email-monitoring/notification`                                            | Endpoint for email change notifications to be sent to.                                                |
-| email_monitoring_apim_lifecycle_notification_url | `https://common-dalint-api-management.azure-api.net/dalint-internal/api/v1/email-monitoring/lifecycle-notification`                                  | Email for lifecycle notifications to be sent to.                                                      |
+| email_monitoring_apim_change_notification_url    | `https://common-dalint-api-management.azure-api.net/dalint-internal/api/v1/email-monitoring/notification`                                  | Endpoint for email change notifications to be sent to.                                                |
+| email_monitoring_apim_lifecycle_notification_url | `https://common-dalint-api-management.azure-api.net/dalint-internal/api/v1/email-monitoring/lifecycle-notification`                        | Email for lifecycle notifications to be sent to.                                                      |
 | email_monitoring_client_state                    | Value from key vault secret `email-monitoring-client-secret`                                                                               | Client secret for service principal used to authenticate with Microsoft Graph for email subscription. |
 | email_monitoring_mailbox                         | `autosubs@daleuw.com`                                                                                                                      | The mailbox which is being monitored for submissions.                                                 |
 
