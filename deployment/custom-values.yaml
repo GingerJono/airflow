@@ -5,7 +5,7 @@ airflow:
   ## configs for the airflow container image
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/configuration/airflow-version.md
   image:
-    repository: pocdalintairflowcontainerregistry.azurecr.io/dalint-airflow-poc
+    repository: commondalintairflowcontainerregistry.azurecr.io/dalint-airflow
     tag: "eb6140dcf1297caedb96b857eb99654e1fc315fa"
     
     ## WARNING: even if set to "Always" DO NOT reuse tag names, 

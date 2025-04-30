@@ -95,7 +95,7 @@ The docker image tag is used to identify the correct image for the airflow deplo
 1. Build the image locally
 
    ```sh
-   docker build . -t pocdalintairflowcontainerregistry.azurecr.io/dalint-airflow-poc:<git-hash>
+   docker build . -t commondalintairflowcontainerregistry.azurecr.io/dalint-airflow:<git-hash>
    ```
 
    1. The first part of the image name (before the `:`) is the path to where in ACR we want to save the image
@@ -104,13 +104,13 @@ The docker image tag is used to identify the correct image for the airflow deplo
 
    ```sh
    az login
-   az acr login --name pocdalintairflowcontainerregistry
+   az acr login --name commondalintairflowcontainerregistry
    ```
   
 3. Push the docker image to the registry
 
    ```sh
-   docker push pocdalintairflowcontainerregistry.azurecr.io/dalint-airflow-poc:<git-hash>
+   docker push commondalintairflowcontainerregistry.azurecr.io/dalint-airflow:<git-hash>
    ```
 
 4. Update the file `deployment/custom-values.yaml` and set the `tag` value to be the tag (i.e. `<git-hash>`) that you used for your image.
@@ -120,10 +120,10 @@ The docker image tag is used to identify the correct image for the airflow deplo
 All instructions are written to be run from the root of this repo.
 
 1. Login to Azure CLI using `az login` and select the DaleUW directory.
-2. Get credentials for Kubernetes CLI
+2. Get credentials for Kubernetes CLI. Take care here, the `<env>` value set below will fully determine which environment you are deploying to!
 
    ```sh
-   az aks get-credentials --resource-group poc-dalint-k8s-rg --name poc-dalint-k8s-cluster
+   az aks get-credentials --resource-group <env>-dalint-k8s-rg --name <env>-dalint-k8s-cluster
    ```
 
 3. Set the `integration-layer-airflow` namespace as default
@@ -148,6 +148,10 @@ All instructions are written to be run from the root of this repo.
    ```sh
    helm upgrade airflow airflow-stable/airflow --values ./deployment/custom-values.yaml
    ```
+   
+   - Before doing this is may be sensible to confirm the currently kubectl context,
+   which determines the environment this affects. This can be done using the command `kubectl config current-context`.
+   - You can use `kubectl config view` to see all available contexts, and `kubectl config use-context` to set the context
 
 To check if everything has worked you may find the following commands useful:
 
