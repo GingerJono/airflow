@@ -106,7 +106,7 @@ airflow:
     
     JONO_PASSWORD:
       kind: secret
-      name: jon-oneil-user-details
+      name: jon-oneill-user-details
       key: password
     
     BECKY_PASSWORD:
