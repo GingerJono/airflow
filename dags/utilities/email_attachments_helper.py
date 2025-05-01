@@ -5,11 +5,49 @@ import logging
 from typing import Callable, Optional
 
 import docx2txt
+import pymupdf
+import pandas as pd
+import pptx
 
 logger = logging.getLogger(__name__)
 
+def _extract_text_pdf(pdf_file: io.BytesIO) -> str:
+    doc = pymupdf.open(stream=pdf_file, filetype="pdf")
+
+    text = ""
+    for page_num in range(len(doc)):
+        page = doc[page_num]
+        text += page.get_text()
+
+    doc.close()
+
+    return text
+
+def _extract_text_excel(excel_file: io.BytesIO) -> str:
+    all_sheets = pd.read_excel(excel_file, sheet_name=None)
+
+    csv_outputs = {}
+    for sheet_name, df in all_sheets.items():
+        csv_buffer = io.StringIO()
+        df.to_csv(csv_buffer, index=False)
+        csv_outputs[sheet_name] = csv_buffer.getvalue()
+    
+    return json.dumps(csv_outputs)
+
+def _extract_text_powerpoint(powerpoint_file: io.BytesIO) -> str:
+    presentation = pptx.Presentation(powerpoint_file)
+
+    text = ""
+    for i, slide in enumerate(presentation.slides):
+        for shape in slide.shapes:
+            text += f"slide: {i}, text: {shape.text}, "
+
+
 SUPPORTED_FILE_TYPES: dict[str, Callable[[io.BytesIO], str]] = {
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": docx2txt.process
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": docx2txt.process,
+    "application/pdf": _extract_text_pdf,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.shee": _extract_text_excel,
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": _extract_text_powerpoint
 }
 
 
