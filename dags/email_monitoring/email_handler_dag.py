@@ -13,7 +13,7 @@ from utilities.blob_storage_helper import (
     read_file_as_string,
     write_string_to_file,
 )
-from utilities.file_attachments_helper import parse_attachments_for_text
+from utilities.email_attachments_helper import parse_attachments_for_text
 from utilities.msgraph_helper import (
     get_attachments_from_email_id,
     get_email_from_id,
