@@ -13,7 +13,7 @@ from utilities.blob_storage_helper import (
     read_file_as_string,
     write_string_to_file,
 )
-from utilities.email_attachments_helper import parse_attachments_for_text
+from utilities.email_attachments_helper import get_attachments_text
 from utilities.msgraph_helper import (
     get_attachments_from_email_id,
     get_email_from_id,
@@ -178,10 +178,6 @@ def process_email_change_notifications():
             )
             raise Exception("Unexpected email content type")
 
-        logger.info(
-            "Email content successfully parsed, writing parsed content to storage."
-        )
-
         return "get_llm_response"
 
     @task
@@ -207,7 +203,7 @@ def process_email_change_notifications():
 
         logger.info("Retrieved graph response")
 
-        attachments_parsed_for_text = []
+        attachments_text = []
         attachments_for_email = []
         if msgraph_response["hasAttachments"]:
             msgraph_attachments_response = json.loads(
@@ -217,9 +213,7 @@ def process_email_change_notifications():
                 )
             )
 
-            attachments_parsed_for_text = parse_attachments_for_text(
-                msgraph_attachments_response
-            )
+            attachments_text = get_attachments_text(msgraph_attachments_response)
 
             attachments_for_email = [
                 {
@@ -247,9 +241,9 @@ def process_email_change_notifications():
         llm_response = get_llm_chat_response(
             email_subject=email_subject,
             email_contents=parsed_email_body,
-            attachments_text=attachments_parsed_for_text,
+            attachments_text=attachments_text,
         )
-        augmented_email_body = f"{llm_response}<br/><hr><br/{email_body}"
+        augmented_email_body = f"{llm_response}<br/><hr><br/>{email_body}"
 
         email_object = {
             "subject": augmented_email_subject,
@@ -258,11 +252,6 @@ def process_email_change_notifications():
         }
 
         email_object_path = f"{run_id}/{email_id}/{EMAIL_RESPONSE_FILENAME}"
-        logger.info(
-            "Would send email with title %s and body %s",
-            augmented_email_subject,
-            augmented_email_body,
-        )
 
         write_string_to_file(
             container_name=BLOB_CONTAINER,
