@@ -102,6 +102,11 @@ def get_email_from_id(email_id: str, mailbox: str):
     return _run_msgraph_query(url=f"/users/{mailbox}/messages/{email_id}")
 
 
+def get_attachments_from_email_id(email_id: str, mailbox: str):
+    logger.info("Getting attachments info from MS Graph based on ID: %s", email_id)
+    return _run_msgraph_query(url=f"/users/{mailbox}/messages/{email_id}/attachments")
+
+
 def send_email(subject: str, html_content: str, to_address: str, sending_mailbox: str):
     logger.info(f"Sending email with subject {subject}")
     request_body = {

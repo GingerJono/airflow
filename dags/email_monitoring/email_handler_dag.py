@@ -13,7 +13,12 @@ from utilities.blob_storage_helper import (
     read_file_as_string,
     write_string_to_file,
 )
-from utilities.msgraph_helper import get_email_from_id, send_email
+from utilities.file_attachments_helper import get_attachment_details
+from utilities.msgraph_helper import (
+    get_attachments_from_email_id,
+    get_email_from_id,
+    send_email,
+)
 from utilities.open_ai_helper import get_llm_chat_response
 
 NUM_RETRIES = 2
@@ -22,7 +27,8 @@ RETRY_DELAY_MINS = 3
 
 BLOB_CONTAINER = "email-monitoring-data"
 
-GRAPH_RESPONSE_FILENAME = "graph_message_response_raw"
+GRAPH_EMAIL_RESPONSE_FILENAME = "graph_message_response_raw"
+GRAPH_ATTACHMENTS_RESPONSE_FILENAME = "graph_attachments_response_raw"
 EMAIL_BODY_FILENAME = "email_body_text"
 LLM_RESPONSE_FILENAME = "llm_response"
 EMAIL_RESPONSE_FILENAME = "email_response"
@@ -62,16 +68,13 @@ def process_email_change_notifications():
         return email_ids
 
     @task
-    def get_email_content(email_id: str, dag_run: DagRun | None = None) -> str:
+    def get_email_content(email_id: str, dag_run: DagRun | None = None):
         """
         Retrieves the content of an email from MS Graph, and saves the raw response
         to Azure Blob Storage.
 
         Args:
             email_id (str): The id of the email to retrieve from MS Graph
-
-        Returns:
-            str: The id of the email, always matches email_id argument passed in.
         """
         logger.info("Retrieving email with id %s", email_id)
 
@@ -81,12 +84,43 @@ def process_email_change_notifications():
         logger.info("Saving email content to blob storage...")
         run_id = dag_run.run_id
 
-        blob_path = f"{run_id}/{email_id}/{GRAPH_RESPONSE_FILENAME}"
+        email_blob_path = f"{run_id}/{email_id}/{GRAPH_EMAIL_RESPONSE_FILENAME}"
 
-        write_string_to_file(BLOB_CONTAINER, blob_path, json.dumps(result))
+        write_string_to_file(BLOB_CONTAINER, email_blob_path, json.dumps(result))
+        
+        logger.info("Email content saved to blob storage: %s", email_blob_path)
 
-        logger.info("Email content saved to blob storage: %s", blob_path)
-        return email_id
+    
+    @task
+    def get_email_attachments(email_id: str, dag_run: DagRun | None = None):
+        """
+        Retrieves the content of files attached to an email from MS Graph, 
+        and saves the raw response to Azure Blob Storage.
+
+        Args:
+            email_id (str): The id of the email to retrieve the attachments 
+            of from MS Graph
+        """
+        run_id = dag_run.run_id
+
+        msgraph_response = json.loads(
+            read_file_as_string(
+                container_name=BLOB_CONTAINER,
+                blob_name=f"{run_id}/{email_id}/{GRAPH_EMAIL_RESPONSE_FILENAME}",
+            )
+        )
+
+        if msgraph_response["hasAttachments"]:
+            logger.info("Retrieving attachments for email with id %s", email_id)
+            mailbox = Variable.get("email_monitoring_mailbox")
+            attachments = get_attachments_from_email_id(email_id=email_id, mailbox=mailbox)
+            
+            logger.info("Saving email attachments to blob storage...")
+            attachments_blob_path = f"{run_id}/{email_id}/{GRAPH_ATTACHMENTS_RESPONSE_FILENAME}"
+            write_string_to_file(BLOB_CONTAINER, attachments_blob_path, json.dumps(attachments))
+            
+            logger.info("Email attachments saved to blob storage blob: %s", f"{attachments_blob_path}")
+
 
     @task.branch
     def check_and_parse_email(email_id: str, dag_run: DagRun | None = None):
@@ -94,7 +128,7 @@ def process_email_change_notifications():
         Processes the MSGraph response containing the email.
 
         If the email was received from the mailbox which is monitored
-        then no futher processing should be done, as this may an email
+        then no further processing should be done, as this may an email
         sent by this DAG.
 
         Otherwise, the body of the email is retrieved and processed to
@@ -110,7 +144,7 @@ def process_email_change_notifications():
 
         msgraph_response = read_file_as_string(
             container_name=BLOB_CONTAINER,
-            blob_name=f"{run_id}/{email_id}/{GRAPH_RESPONSE_FILENAME}",
+            blob_name=f"{run_id}/{email_id}/{GRAPH_EMAIL_RESPONSE_FILENAME}",
         )
 
         logger.debug(msgraph_response)
@@ -169,9 +203,11 @@ def process_email_change_notifications():
 
         run_id = dag_run.run_id
 
+        base_path = f"{run_id}/{email_id}"
+
         email_body = read_file_as_string(
             container_name=BLOB_CONTAINER,
-            blob_name=f"{run_id}/{email_id}/{EMAIL_BODY_FILENAME}",
+            blob_name=f"{base_path}/{EMAIL_BODY_FILENAME}",
         )
 
         logger.info("Retrieved email body")
@@ -179,17 +215,30 @@ def process_email_change_notifications():
         msgraph_response = json.loads(
             read_file_as_string(
                 container_name=BLOB_CONTAINER,
-                blob_name=f"{run_id}/{email_id}/{GRAPH_RESPONSE_FILENAME}",
+                blob_name=f"{base_path}/{GRAPH_EMAIL_RESPONSE_FILENAME}",
             )
         )
 
         logger.info("Retrieved graph response")
 
+        attachments = []
+        if msgraph_response["hasAttachments"]:
+            msgraph_attachments_response = json.loads(
+                read_file_as_string(
+                    container_name=BLOB_CONTAINER,
+                    blob_name=f"{base_path}/{GRAPH_ATTACHMENTS_RESPONSE_FILENAME}"
+                )
+            )
+
+            attachments = get_attachment_details(msgraph_attachments_response)
+        
+        logger.info("Retrieved email attachments")
+
         email_subject = msgraph_response["subject"]
         augmented_email_subject = f"[LLM Enriched] {email_subject}"
 
         llm_response = get_llm_chat_response(
-            email_subject=email_subject, email_contents=email_body
+            email_subject=email_subject, email_contents=email_body, attachments=attachments
         )
         augmented_email_body = f"{llm_response}<br/><hr><br/>{email_body}"
 
@@ -250,11 +299,13 @@ def process_email_change_notifications():
 
     email_content_task_instance = get_email_content.expand(email_id=email_ids)
 
+    email_attachments_task_instance = get_email_attachments.expand(email_id=email_ids)
+    
     parse_email_task_instance = check_and_parse_email.expand(email_id=email_ids)
 
     email_object_paths = get_llm_response.expand(email_id=email_ids)
 
-    email_content_task_instance >> parse_email_task_instance >> email_object_paths
+    email_content_task_instance >> email_attachments_task_instance >> parse_email_task_instance >> email_object_paths
 
     send_email_to_inbox.expand(email_object_path=email_object_paths)
 
