@@ -29,7 +29,6 @@ BLOB_CONTAINER = "email-monitoring-data"
 
 GRAPH_EMAIL_RESPONSE_FILENAME = "graph_message_response_raw"
 GRAPH_ATTACHMENTS_RESPONSE_FILENAME = "graph_attachments_response_raw"
-EMAIL_BODY_FILENAME = "email_body_text"
 LLM_RESPONSE_FILENAME = "llm_response"
 EMAIL_RESPONSE_FILENAME = "email_response"
 
@@ -160,33 +159,20 @@ def process_email_change_notifications():
             )
             return "end"
 
-        email_body_content = msgraph_response["body"]["content"]
         email_body_content_type = msgraph_response["body"]["contentType"]
 
         logger.debug("Email body content of type %s", email_body_content_type)
 
-        parsed_email_content: str
-
-        match email_body_content_type:
-            case "text":
-                parsed_email_content = email_body_content
-            case "html":
-                parsed_email_content = html2text(email_body_content)
-            case _:
-                logger.error(
+        if email_body_content_type != "text" and email_body_content_type != "html":
+            logger.error(
                     "Unexpected email body type %s for email with id %s",
                     email_body_content_type,
                     email_id,
                 )
-                raise Exception("Unexpected email content type")
+            raise Exception("Unexpected email content type")
 
         logger.info(
             "Email content successfully parsed, writing parsed content to storage."
-        )
-        write_string_to_file(
-            container_name=BLOB_CONTAINER,
-            blob_name=f"{run_id}/{email_id}/{EMAIL_BODY_FILENAME}",
-            string_data=parsed_email_content,
         )
 
         return "get_llm_response"
@@ -204,13 +190,6 @@ def process_email_change_notifications():
         run_id = dag_run.run_id
 
         base_path = f"{run_id}/{email_id}"
-
-        email_body = read_file_as_string(
-            container_name=BLOB_CONTAINER,
-            blob_name=f"{base_path}/{EMAIL_BODY_FILENAME}",
-        )
-
-        logger.info("Retrieved email body")
 
         msgraph_response = json.loads(
             read_file_as_string(
@@ -237,10 +216,14 @@ def process_email_change_notifications():
         email_subject = msgraph_response["subject"]
         augmented_email_subject = f"[LLM Enriched] {email_subject}"
 
+        email_body = msgraph_response["body"]["content"]
+        email_body_content_type = msgraph_response["body"]["contentType"]
+        parsed_email_body = html2text(email_body) if email_body_content_type == "html" else email_body
+        
         llm_response = get_llm_chat_response(
-            email_subject=email_subject, email_contents=email_body, attachments=attachments
+            email_subject=email_subject, email_contents=parsed_email_body, attachments=attachments
         )
-        augmented_email_body = f"{llm_response}<br/><hr><br/>{email_body}"
+        augmented_email_body = f"{llm_response}<br/><hr><br/{email_body}"
 
         email_object = {
             "subject": augmented_email_subject,
