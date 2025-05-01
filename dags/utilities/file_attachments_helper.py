@@ -16,13 +16,13 @@ def parse_attachments_for_text(msgraph_attachments_response: dict) -> list[str]:
         attachment = _parse_attachment(msgraph_attachment)
         if attachment:
             attachments.append(json.dumps(attachment))
-    
+
     return attachments
 
 
 def _parse_attachment(msgraph_attachment: dict) -> Optional[dict]:
     file_type = msgraph_attachment["contentType"]
-    
+
     if file_type not in SUPPORTED_FILE_TYPES:
         return None
 
@@ -35,5 +35,5 @@ def _parse_attachment(msgraph_attachment: dict) -> Optional[dict]:
     return {
         "original_content_type": file_type,
         "file_name": msgraph_attachment["name"],
-        "text": attachment_text
+        "text": attachment_text,
     }

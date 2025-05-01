@@ -107,7 +107,13 @@ def get_attachments_from_email_id(email_id: str, mailbox: str):
     return _run_msgraph_query(url=f"/users/{mailbox}/messages/{email_id}/attachments")
 
 
-def send_email(subject: str, html_content: str, to_address: str, sending_mailbox: str, attachments: list[dict]):
+def send_email(
+    subject: str,
+    html_content: str,
+    to_address: str,
+    sending_mailbox: str,
+    attachments: list[dict],
+):
     logger.info(f"Sending email with subject {subject}")
     request_body = {
         "message": {
@@ -117,7 +123,7 @@ def send_email(subject: str, html_content: str, to_address: str, sending_mailbox
                 "content": html_content,
             },
             "toRecipients": [{"emailAddress": {"address": to_address}}],
-            "attachments": attachments
+            "attachments": attachments,
         }
     }
 

@@ -42,4 +42,4 @@ def _get_prompt(email_subject, email_contents, attachments):
     return f"""Attached is the text of an email message. It contains an insurance submission. Summarise this into a few lines and return it to me.
 Also, Tell me if you know anything about the prospective insured, i.e. have they had any big events that might give rise to an insurance claim in the news? 
 Don't guess though. Keep it to at most 10 bullet points. Use British English in your response.
-\nSubject of the email was {email_subject}\nText from the email body was: {email_contents}\nThe files attached to the email were: {',\n'.join(attachments)}"""
+\nSubject of the email was {email_subject}\nText from the email body was: {email_contents}\nThe files attached to the email were: {",\n".join(attachments)}"""
