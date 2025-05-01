@@ -6,7 +6,7 @@ from airflow.models import Variable
 logger = logging.getLogger(__name__)
 
 
-def get_llm_chat_response(email_subject, email_contents, attachments):
+def get_llm_chat_response(email_subject, email_contents, attachments_text):
     azureAi_api_key = Variable.get("azureai_api_key")
     azureAI_endpoint = Variable.get("azureai_endpoint")
 
@@ -16,7 +16,7 @@ def get_llm_chat_response(email_subject, email_contents, attachments):
         "messages": [
             {
                 "role": "user",
-                "content": _get_prompt(email_subject, email_contents, attachments),
+                "content": _get_prompt(email_subject, email_contents, attachments_text),
             }
         ]
     }

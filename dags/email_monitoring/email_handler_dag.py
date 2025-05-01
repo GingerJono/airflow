@@ -13,7 +13,7 @@ from utilities.blob_storage_helper import (
     read_file_as_string,
     write_string_to_file,
 )
-from utilities.file_attachments_helper import get_attachment_details
+from utilities.file_attachments_helper import parse_attachments_for_text
 from utilities.msgraph_helper import (
     get_attachments_from_email_id,
     get_email_from_id,
@@ -200,7 +200,8 @@ def process_email_change_notifications():
 
         logger.info("Retrieved graph response")
 
-        attachments = []
+        attachments_parsed_for_text = []
+        attachments_for_email = []
         if msgraph_response["hasAttachments"]:
             msgraph_attachments_response = json.loads(
                 read_file_as_string(
@@ -209,7 +210,19 @@ def process_email_change_notifications():
                 )
             )
 
-            attachments = get_attachment_details(msgraph_attachments_response)
+            attachments_parsed_for_text = parse_attachments_for_text(msgraph_attachments_response)
+            
+            attachments_for_email = [
+                {
+                    "@odata.type": attachment["@odata.type"],
+                    "contentType": attachment["contentType"],
+                    "contentBytes": attachment["contentBytes"],
+                    "contentId": attachment["contentId"],
+                    "name": attachment["name"],
+                    "isInline": attachment["isInline"]
+                }
+                for attachment in msgraph_attachments_response["value"]
+            ]
         
         logger.info("Retrieved email attachments")
 
@@ -221,13 +234,14 @@ def process_email_change_notifications():
         parsed_email_body = html2text(email_body) if email_body_content_type == "html" else email_body
         
         llm_response = get_llm_chat_response(
-            email_subject=email_subject, email_contents=parsed_email_body, attachments=attachments
+            email_subject=email_subject, email_contents=parsed_email_body, attachments_text=attachments_parsed_for_text
         )
         augmented_email_body = f"{llm_response}<br/><hr><br/{email_body}"
 
         email_object = {
             "subject": augmented_email_subject,
             "body": augmented_email_body,
+            "attachments": attachments_for_email
         }
 
         email_object_path = f"{run_id}/{email_id}/{EMAIL_RESPONSE_FILENAME}"
@@ -274,6 +288,7 @@ def process_email_change_notifications():
             html_content=email_details["body"],
             to_address=mailbox,
             sending_mailbox=mailbox,
+            attachments=email_details["attachments"]
         )
 
         return

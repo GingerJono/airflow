@@ -10,7 +10,7 @@ SUPPORTED_FILE_TYPES: dict[str, Callable[[io.BytesIO], str]] = {
 }
 
 
-def get_attachment_details(msgraph_attachments_response: dict) -> list[str]:
+def parse_attachments_for_text(msgraph_attachments_response: dict) -> list[str]:
     attachments = []
     for msgraph_attachment in msgraph_attachments_response["value"]:
         attachment = _parse_attachment(msgraph_attachment)
