@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import timedelta
+import markdown as md
 
 from airflow.decorators import dag, task
 from airflow.exceptions import AirflowFailException
@@ -243,7 +244,7 @@ def process_email_change_notifications():
             email_contents=parsed_email_body,
             attachments_text=attachments_text,
         )
-        augmented_email_body = f"{llm_response}<br/><hr><br/>{email_body}"
+        augmented_email_body = f"{md.markdown(llm_response)}<br/><hr><br/>{email_body}"
 
         email_object = {
             "subject": augmented_email_subject,

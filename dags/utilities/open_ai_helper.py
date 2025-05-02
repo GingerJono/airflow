@@ -6,7 +6,7 @@ from airflow.models import Variable
 logger = logging.getLogger(__name__)
 
 
-def get_llm_chat_response(email_subject, email_contents, attachments_text):
+def get_llm_chat_response(email_subject, email_contents, attachments_text) -> str:
     azureAi_api_key = Variable.get("azureai_api_key")
     azureAI_endpoint = Variable.get("azureai_endpoint")
 
