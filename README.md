@@ -10,7 +10,7 @@ The DAGs are synced to the deployed Airflow instance using Git-Sync, with the `m
 
 This codebase uses [uv](https://docs.astral.sh/uv/) as a project and package manager. Install this as per the documentation[here](https://docs.astral.sh/uv/getting-started/installation/).
 
-New dependencies can be added with `uv add <dependency>`, or `uv add --dev <dependency>` for dev dependencies. After updating dependencies the `requirements.txt` file for the deployment should also be updated by running `uv pip compile pyproject.toml -o ./deployment/requirements.txt`
+New dependencies can be added with `uv add <dependency>`, or `uv add --dev <dependency>` for dev dependencies. After updating dependencies the `requirements.txt` file for the deployment should also be updated by running `uv pip compile pyproject.toml -o ./deployment/requirements.txt`. Note: if already running airflow locally you must run `docker compose up --build` for the new dependency to work.
 
 ### Linting
 
@@ -62,6 +62,8 @@ Connections must be set up manually through the UI. There are two connections th
 
 - `microsoft_graph`: connection to Microsoft Graph, using for interacting with the subscription for the email monitoring DAGs
 - `wasb`: connection to Azure Blob Storage, used for saving data between tasks.
+
+See [connections table](#connections)
 
 #### Cleaning up
 
@@ -191,8 +193,8 @@ Variables are set in the UI at Admin > Variables
 
 Connections are set in the UI at Admin > Connections
 
-| Connection Name   | Connection Type                 | Configuration                                                                                                                                                                                                                                                      | Purpose                                                                                |
+| Connection ID   | Connection Type                 | Configuration                                                                                                                                                                                                                                                      | Purpose                                                                                |
 | ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
 | microsoft_graph   | `msgraph` (Microsoft Graph API) | Client ID: From key vault secret `email-monitoring-client-id`</br>Client Secret: From key vault secret `email-monitoring-client-secret`</br>Tenant ID: cd4ffd59-5c74-4b7a-b992-9fc58efba60c</br>API Version: v1.0</br>Scopes: https://graph.microsoft.com/.default | Connection to Microsoft Graph, used for requests relating to the mailbox subscription. |
-| wasb              | `wasb` (Azure Blob Storage)     | SAS Token: Set to blob serve SAS URL for a generated SAS token for the blob storage account. (Note this will need to be updated regularly when it expires, until we move to using a service principal for this authentication)                                     | Connection to Azure Blob storage, used for saving data to blobs to pass between tags.  |
+| wasb              | `wasb` (Azure Blob Storage)     | SAS Token: In the Azure Portal generate a SAS Token copy the `Blob service SAS URL` into the `SAS Token` field                                       | Connection to Azure Blob storage, used for saving data to blobs to pass between tags.  |
 | wasb-airflow-logs | `wasb` (Azure Blob Storage)     | Same as wasb connection                                                                                                                                                                                                                                            | Connection to Azure Blob storage, used for reading and writing logs from/to blobs.     |

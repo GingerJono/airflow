@@ -252,6 +252,8 @@ distro==1.9.0
     # via openai
 dnspython==2.7.0
     # via email-validator
+docx2txt==0.9
+    # via integration-layer-airflow (pyproject.toml)
 email-validator==2.2.0
     # via flask-appbuilder
 flask==2.2.5

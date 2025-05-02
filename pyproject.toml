@@ -11,6 +11,7 @@ dependencies = [
     "html2text>=2024.2.26",
     "openai==1.70.0",
     "apache-airflow-providers-celery==3.10.5",
+    "docx2txt>=0.9",
 ]
 
 [dependency-groups]
