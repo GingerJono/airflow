@@ -256,6 +256,8 @@ docx2txt==0.9
     # via integration-layer-airflow (pyproject.toml)
 email-validator==2.2.0
     # via flask-appbuilder
+et-xmlfile==2.0.0
+    # via openpyxl
 flask==2.2.5
     # via
     #   apache-airflow
@@ -483,6 +485,8 @@ numpy==2.2.5
 oauthlib==3.2.2
     # via requests-oauthlib
 openai==1.70.0
+    # via integration-layer-airflow (pyproject.toml)
+openpyxl==3.1.5
     # via integration-layer-airflow (pyproject.toml)
 opentelemetry-api==1.32.0
     # via

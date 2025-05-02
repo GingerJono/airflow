@@ -17,7 +17,7 @@ def _extract_text_pdf(pdf_file: io.BytesIO) -> str:
     text = ""
     for page_num in range(len(doc)):
         page = doc[page_num]
-        text += page.get_text()
+        text += f"Page {page_num + 1}:\n{page.get_text()}\n"
 
     doc.close()
 
@@ -46,7 +46,7 @@ def _extract_text_powerpoint(powerpoint_file: io.BytesIO) -> str:
 SUPPORTED_FILE_TYPES: dict[str, Callable[[io.BytesIO], str]] = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": docx2txt.process,
     "application/pdf": _extract_text_pdf,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.shee": _extract_text_excel,
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": _extract_text_excel,
     "application/vnd.openxmlformats-officedocument.presentationml.presentation": _extract_text_powerpoint
 }
 
