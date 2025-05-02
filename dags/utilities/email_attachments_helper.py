@@ -5,9 +5,9 @@ import logging
 from typing import Callable, Optional
 
 import docx2txt
-import pymupdf
 import pandas as pd
 import pptx
+import pymupdf
 
 logger = logging.getLogger(__name__)
 
