@@ -13,14 +13,11 @@ logger = logging.getLogger(__name__)
 
 
 def _extract_text_pdf(pdf_file: io.BytesIO) -> str:
-    doc = pymupdf.open(stream=pdf_file, filetype="pdf")
-
-    text = ""
-    for page_num in range(len(doc)):
-        page = doc[page_num]
-        text += f"Page {page_num + 1}:\n{page.get_text()}\n"
-
-    doc.close()
+    with pymupdf.open(stream=pdf_file, filetype="pdf") as doc:
+        text = ""
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            text += f"Page {page_num + 1}:\n{page.get_text()}\n"
 
     return text
 
