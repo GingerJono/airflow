@@ -14,12 +14,12 @@ logger = logging.getLogger(__name__)
 
 def _extract_text_pdf(pdf_file: io.BytesIO) -> str:
     with pymupdf.open(stream=pdf_file, filetype="pdf") as doc:
-        text = ""
+        pages = []
         for page_num in range(len(doc)):
             page = doc[page_num]
-            text += f"Page {page_num + 1}:\n{page.get_text()}\n"
+            pages.append({"page_number": page_num + 1, "text": page.get_text()})
 
-    return text
+    return json.dumps({"pages": pages})
 
 
 def _extract_text_excel(excel_file: io.BytesIO) -> str:
@@ -92,5 +92,5 @@ def _parse_attachment(msgraph_attachment: dict) -> Optional[dict]:
     return {
         "original_file_type": file_type,
         "file_name": msgraph_attachment["name"],
-        "text": attachment_text,
+        "content": attachment_text,
     }
