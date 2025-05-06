@@ -256,6 +256,8 @@ docx2txt==0.9
     # via integration-layer-airflow (pyproject.toml)
 email-validator==2.2.0
     # via flask-appbuilder
+et-xmlfile==2.0.0
+    # via openpyxl
 flask==2.2.5
     # via
     #   apache-airflow
@@ -401,8 +403,12 @@ lockfile==0.12.2
     # via
     #   apache-airflow
     #   python-daemon
+lxml==5.4.0
+    # via python-pptx
 mako==1.3.10
     # via alembic
+markdown==3.8
+    # via integration-layer-airflow (pyproject.toml)
 markdown-it-py==3.0.0
     # via
     #   apache-airflow
@@ -476,9 +482,13 @@ multidict==6.4.2
     # via
     #   aiohttp
     #   yarl
+numpy==2.2.5
+    # via pandas
 oauthlib==3.2.2
     # via requests-oauthlib
 openai==1.70.0
+    # via integration-layer-airflow (pyproject.toml)
+openpyxl==3.1.5
     # via integration-layer-airflow (pyproject.toml)
 opentelemetry-api==1.32.0
     # via
@@ -525,12 +535,16 @@ packaging==24.2
     #   limits
     #   marshmallow
     #   marshmallow-sqlalchemy
+pandas==2.2.3
+    # via integration-layer-airflow (pyproject.toml)
 pathspec==0.12.1
     # via apache-airflow
 pendulum==3.0.0
     # via
     #   apache-airflow
     #   microsoft-kiota-serialization-json
+pillow==11.2.1
+    # via python-pptx
 pluggy==1.5.0
     # via apache-airflow
 prison==0.2.1
@@ -566,6 +580,8 @@ pyjwt==2.10.1
     #   flask-appbuilder
     #   flask-jwt-extended
     #   msal
+pymupdf==1.25.5
+    # via integration-layer-airflow (pyproject.toml)
 python-daemon==3.1.2
     # via apache-airflow
 python-dateutil==2.9.0.post0
@@ -577,10 +593,13 @@ python-dateutil==2.9.0.post0
     #   croniter
     #   flask-appbuilder
     #   microsoft-kiota-serialization-text
+    #   pandas
     #   pendulum
     #   time-machine
 python-nvd3==0.16.0
     # via apache-airflow
+python-pptx==1.0.2
+    # via integration-layer-airflow (pyproject.toml)
 python-slugify==8.0.4
     # via
     #   apache-airflow
@@ -590,6 +609,7 @@ pytz==2025.2
     #   croniter
     #   flask-babel
     #   flower
+    #   pandas
 pyyaml==6.0.2
     # via
     #   apispec
@@ -704,6 +724,7 @@ typing-extensions==4.13.1
     #   opentelemetry-sdk
     #   pydantic
     #   pydantic-core
+    #   python-pptx
     #   referencing
     #   typing-inspection
 typing-inspection==0.4.0
@@ -711,6 +732,7 @@ typing-inspection==0.4.0
 tzdata==2025.2
     # via
     #   kombu
+    #   pandas
     #   pendulum
 uc-micro-py==1.0.3
     # via linkify-it-py
@@ -741,6 +763,8 @@ wtforms==3.2.1
     # via
     #   flask-appbuilder
     #   flask-wtf
+xlsxwriter==3.2.3
+    # via python-pptx
 yarl==1.19.0
     # via aiohttp
 zipp==3.21.0
