@@ -1,8 +1,8 @@
 import json
 import logging
 from datetime import timedelta
-import markdown as md
 
+import markdown as md
 from airflow.decorators import dag, task
 from airflow.exceptions import AirflowFailException
 from airflow.models import Variable
@@ -283,13 +283,15 @@ def process_email_change_notifications():
         )
 
         mailbox = Variable.get("email_monitoring_mailbox")
+        recipients = Variable.get("email_monitoring_recipients", deserialize_json=True)
 
-        logger.info("mailbox %s", mailbox)
+        logger.debug("Will send mail from mailbox %s", mailbox)
+        logger.debug("Will send email to recipients %s", recipients)
 
         send_email(
             subject=email_details["subject"],
             html_content=email_details["body"],
-            to_address=mailbox,
+            to_address=recipients,
             sending_mailbox=mailbox,
             attachments=email_details["attachments"],
         )
