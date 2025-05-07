@@ -291,7 +291,7 @@ def process_email_change_notifications():
         send_email(
             subject=email_details["subject"],
             html_content=email_details["body"],
-            to_address=recipients,
+            to_addresses=recipients,
             sending_mailbox=mailbox,
             attachments=email_details["attachments"],
         )
