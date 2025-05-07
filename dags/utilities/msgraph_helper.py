@@ -110,7 +110,7 @@ def get_attachments_from_email_id(email_id: str, mailbox: str):
 def send_email(
     subject: str,
     html_content: str,
-    to_address: str,
+    to_addresses: list[str],
     sending_mailbox: str,
     attachments: list[dict],
 ):
@@ -122,7 +122,9 @@ def send_email(
                 "contentType": "html",
                 "content": html_content,
             },
-            "toRecipients": [{"emailAddress": {"address": to_address}}],
+            "toRecipients": [
+                {"emailAddress": {"address": to_address}} for to_address in to_addresses
+            ],
             "attachments": attachments,
         }
     }

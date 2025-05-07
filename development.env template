@@ -3,9 +3,11 @@ AIRFLOW_UID=50000
 # Airflow variables
 
 AIRFLOW_VAR_EMAIL_MONITORING_MAILBOX=<mailbox>
+# Update this to your email address to receive the results of your testing and check them
+AIRFLOW_VAR_EMAIL_MONITORING_RECIPIENTS=["<your-email-address>"]
 AIRFLOW_VAR_EMAIL_MONITORING_CLIENT_STATE=<client state>
-AIRFLOW_VAR_EMAIL_MONITORING_APIM_CHANGE_NOTIFICATION_URL=https://common-dalint-api-management.azure-api.net/dalint-internal/api/v1/email-monitoring/notification
-AIRFLOW_VAR_EMAIL_MONITORING_APIM_LIFECYCLE_NOTIFICATION_URL=https://common-dalint-api-management.azure-api.net/dalint-internal/api/v1/email-monitoring/lifecycle-notification
+AIRFLOW_VAR_EMAIL_MONITORING_APIM_CHANGE_NOTIFICATION_URL=https://common-dalint-api-management.azure-api.net/dev/dalint-internal/api/v1/email-monitoring/notification
+AIRFLOW_VAR_EMAIL_MONITORING_APIM_LIFECYCLE_NOTIFICATION_URL=https://common-dalint-api-management.azure-api.net/dev/dalint-internal/api/v1/email-monitoring/lifecycle-notification
 
 AIRFLOW_VAR_AZUREAI_API_KEY=<api key>
 AIRFLOW_VAR_AZUREAI_ENDPOINT=<endpoint>
