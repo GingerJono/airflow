@@ -68,8 +68,8 @@ SYSTEM_PROMPT = (
 
 
 def _get_user_prompt(email_subject, email_contents, attachments):
-    subject = f"Subject of the email was: {email_subject}"
-    email_text = f"Text from the email body was:\n{email_contents}"
+    subject = f"Email subject: {email_subject}"
+    email_text = f"Email body:\n{email_contents}"
 
     attachments_text = ""
     if attachments:
