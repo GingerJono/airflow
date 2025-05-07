@@ -15,9 +15,15 @@ def get_llm_chat_response(email_subject, email_contents, attachments_text) -> st
     payload = {
         "messages": [
             {
+                "role": "system",
+                "content": SYSTEM_PROMPT,
+            },
+            {
                 "role": "user",
-                "content": _get_prompt(email_subject, email_contents, attachments_text),
-            }
+                "content": _get_user_prompt(
+                    email_subject, email_contents, attachments_text
+                ),
+            },
         ]
     }
 
@@ -38,8 +44,37 @@ def get_llm_chat_response(email_subject, email_contents, attachments_text) -> st
         return content
 
 
-def _get_prompt(email_subject, email_contents, attachments):
-    return f"""Attached is the text of an email message. It contains an insurance submission. Summarise this into a few lines and return it to me.
-Also, Tell me if you know anything about the prospective insured, i.e. have they had any big events that might give rise to an insurance claim in the news? 
-Don't guess though. Keep it to at most 10 bullet points. Use British English in your response.
-\nSubject of the email was {email_subject}\nText from the email body was: {email_contents}\nThe files attached to the email were: {",\n".join(attachments)}"""
+ROLE_ASSIGNMENT = "You are an assistant to an insurance underwriting team. Your job is to write email summaries of submissions for prospective insurance policies to help underwriters assess opportunities."
+INFORMATION_OF_INTEREST = """Information of interest includes but is not limited to:
++ Company details (company name, industry, size, location).
++ Type of insurance being offered.
++ Proposed clauses/terms and conditions.
++ Deductibles being proposed by the broker.
++ Claims history summary (if available).
++ Risk assessment factors highlighted in the submission.
++ Information that may affect the underwriters interest."""
+LANGUAGE_AND_STRUCTURE = """Language and structure:
++ Structure with clear headings for each section.
++ Use the UK English spellings of words.
++ Format using markdown syntax."""
+TONE = """Tone of responses:
++ Be professional and objective.
++ Factual rather than speculative.
++ Flag areas of concern without making recommendations.
++ Be concise in your summarisation."""
+SYSTEM_PROMPT = (
+    f"{ROLE_ASSIGNMENT}\n{INFORMATION_OF_INTEREST}\n{LANGUAGE_AND_STRUCTURE}\n{TONE}"
+)
+
+
+def _get_user_prompt(email_subject, email_contents, attachments):
+    subject = f"Subject of the email was: {email_subject}"
+    email_text = f"Text from the email body was:\n{email_contents}"
+
+    attachments_text = ""
+    if attachments:
+        attachments_text = (
+            f"The files attached to the email were:\n{',\n'.join(attachments)}"
+        )
+
+    return f"{subject}\n{email_text}\n{attachments_text}"

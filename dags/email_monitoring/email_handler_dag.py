@@ -1,8 +1,8 @@
 import json
 import logging
 from datetime import timedelta
-import markdown as md
 
+import markdown as md
 from airflow.decorators import dag, task
 from airflow.exceptions import AirflowFailException
 from airflow.models import Variable
