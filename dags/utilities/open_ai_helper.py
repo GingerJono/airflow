@@ -74,7 +74,7 @@ def _get_user_prompt(email_subject, email_contents, attachments):
     attachments_text = ""
     if attachments:
         attachments_text = (
-            f"The files attached to the email were:\n{',\n'.join(attachments)}"
+            f"Email attachments:\n{',\n'.join(attachments)}"
         )
 
     return f"{subject}\n{email_text}\n{attachments_text}"
