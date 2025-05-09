@@ -1,45 +1,40 @@
 import base64
-import io
-import json
 import logging
+from io import BytesIO, StringIO
+from json import dumps as json_serialise
 from typing import Callable, Optional
 
 from docx2txt import process as process_docx
-
-# import docx2txt
-# import pptx
-# import pandas as pd
-# import pymupdf
-from pandas import read_excel as read_excel
+from pandas import read_excel
 from pptx import Presentation
 from pymupdf import open as pdf_open
 
 logger = logging.getLogger(__name__)
 
 
-def _extract_text_pdf(pdf_file: io.BytesIO) -> str:
+def _extract_text_pdf(pdf_file: BytesIO) -> str:
     with pdf_open(stream=pdf_file, filetype="pdf") as doc:
         pages = []
         for page_num in range(len(doc)):
             page = doc[page_num]
             pages.append({"page_number": page_num + 1, "text": page.get_text()})
 
-    return json.dumps({"pages": pages})
+    return json_serialise({"pages": pages})
 
 
-def _extract_text_excel(excel_file: io.BytesIO) -> str:
+def _extract_text_excel(excel_file: BytesIO) -> str:
     all_sheets = read_excel(excel_file, sheet_name=None)
 
     csv_outputs = {}
     for sheet_name, df in all_sheets.items():
-        csv_buffer = io.StringIO()
+        csv_buffer = StringIO()
         df.to_csv(csv_buffer, index=False)
         csv_outputs[sheet_name] = csv_buffer.getvalue()
 
-    return json.dumps(csv_outputs)
+    return json_serialise(csv_outputs)
 
 
-def _extract_text_powerpoint(powerpoint_file: io.BytesIO) -> str:
+def _extract_text_powerpoint(powerpoint_file: BytesIO) -> str:
     presentation = Presentation(powerpoint_file)
 
     all_slides = []
@@ -49,10 +44,10 @@ def _extract_text_powerpoint(powerpoint_file: io.BytesIO) -> str:
             shapes_on_slide.append({"shape_text": shape.text})
         all_slides.append({"slide_number": i + 1, "shapes": shapes_on_slide})
 
-    return json.dumps({"presentation": all_slides})
+    return json_serialise({"presentation": all_slides})
 
 
-SUPPORTED_FILE_TYPES: dict[str, Callable[[io.BytesIO], str]] = {
+SUPPORTED_FILE_TYPES: dict[str, Callable[[BytesIO], str]] = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": process_docx,
     "application/pdf": _extract_text_pdf,
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": _extract_text_excel,
@@ -65,7 +60,7 @@ def get_attachments_text(msgraph_attachments_response: dict) -> list[str]:
     for msgraph_attachment in msgraph_attachments_response["value"]:
         attachment = _parse_attachment(msgraph_attachment)
         if attachment:
-            attachments.append(json.dumps(attachment))
+            attachments.append(json_serialise(attachment))
 
     return attachments
 
@@ -90,7 +85,7 @@ def _parse_attachment(msgraph_attachment: dict) -> Optional[dict]:
 
     attachment_bytes = base64.b64decode(msgraph_attachment["contentBytes"])
 
-    attachment_file = io.BytesIO(attachment_bytes)
+    attachment_file = BytesIO(attachment_bytes)
 
     attachment_text = SUPPORTED_FILE_TYPES[file_type](attachment_file)
 

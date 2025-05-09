@@ -1,5 +1,5 @@
-import asyncio
 import logging
+from asyncio import get_event_loop
 from datetime import UTC, datetime, timedelta
 
 from airflow.providers.microsoft.azure.hooks.msgraph import (
@@ -29,7 +29,7 @@ def _run_msgraph_query(
         data,
     )
     conn = MSGraphHook(conn_id=MSGRAPH_CONNECTION_ID)
-    loop = asyncio.get_event_loop()
+    loop = get_event_loop()
 
     result = loop.run_until_complete(
         conn.run(

@@ -1,7 +1,7 @@
 import logging
 
-import requests
 from airflow.models import Variable
+from requests import post
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ def get_llm_chat_response(email_subject, email_contents, attachments_text) -> st
         "Submitting LLM chat request\nHeader: %s\nPayload:%s", headers, payload
     )
 
-    response = requests.post(azureAI_endpoint, headers=headers, json=payload)
+    response = post(azureAI_endpoint, headers=headers, json=payload)
     response.raise_for_status()
 
     response_json = response.json()
