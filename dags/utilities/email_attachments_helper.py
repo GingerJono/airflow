@@ -4,16 +4,21 @@ import json
 import logging
 from typing import Callable, Optional
 
-import docx2txt
-import pandas as pd
-import pptx
-import pymupdf
+from docx2txt import process as process_docx
+
+# import docx2txt
+# import pptx
+# import pandas as pd
+# import pymupdf
+from pandas import read_excel as read_excel
+from pptx import Presentation
+from pymupdf import open as pdf_open
 
 logger = logging.getLogger(__name__)
 
 
 def _extract_text_pdf(pdf_file: io.BytesIO) -> str:
-    with pymupdf.open(stream=pdf_file, filetype="pdf") as doc:
+    with pdf_open(stream=pdf_file, filetype="pdf") as doc:
         pages = []
         for page_num in range(len(doc)):
             page = doc[page_num]
@@ -23,7 +28,7 @@ def _extract_text_pdf(pdf_file: io.BytesIO) -> str:
 
 
 def _extract_text_excel(excel_file: io.BytesIO) -> str:
-    all_sheets = pd.read_excel(excel_file, sheet_name=None)
+    all_sheets = read_excel(excel_file, sheet_name=None)
 
     csv_outputs = {}
     for sheet_name, df in all_sheets.items():
@@ -35,7 +40,7 @@ def _extract_text_excel(excel_file: io.BytesIO) -> str:
 
 
 def _extract_text_powerpoint(powerpoint_file: io.BytesIO) -> str:
-    presentation = pptx.Presentation(powerpoint_file)
+    presentation = Presentation(powerpoint_file)
 
     all_slides = []
     for i, slide in enumerate(presentation.slides):
@@ -48,7 +53,7 @@ def _extract_text_powerpoint(powerpoint_file: io.BytesIO) -> str:
 
 
 SUPPORTED_FILE_TYPES: dict[str, Callable[[io.BytesIO], str]] = {
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": docx2txt.process,
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": process_docx,
     "application/pdf": _extract_text_pdf,
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": _extract_text_excel,
     "application/vnd.openxmlformats-officedocument.presentationml.presentation": _extract_text_powerpoint,
