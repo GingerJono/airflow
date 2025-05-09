@@ -1,6 +1,7 @@
-import json
 import logging
 from datetime import timedelta
+from json import dumps as json_serialize
+from json import loads as json_load
 
 import markdown as md
 from airflow.decorators import dag, task
@@ -86,7 +87,7 @@ def process_email_change_notifications():
 
         email_blob_path = f"{run_id}/{email_id}/{GRAPH_EMAIL_RESPONSE_FILENAME}"
 
-        write_string_to_file(BLOB_CONTAINER, email_blob_path, json.dumps(result))
+        write_string_to_file(BLOB_CONTAINER, email_blob_path, json_serialize(result))
 
         logger.info("Email content saved to blob storage: %s", email_blob_path)
 
@@ -102,7 +103,7 @@ def process_email_change_notifications():
         """
         run_id = dag_run.run_id
 
-        msgraph_response = json.loads(
+        msgraph_response = json_load(
             read_file_as_string(
                 container_name=BLOB_CONTAINER,
                 blob_name=f"{run_id}/{email_id}/{GRAPH_EMAIL_RESPONSE_FILENAME}",
@@ -121,7 +122,7 @@ def process_email_change_notifications():
                 f"{run_id}/{email_id}/{GRAPH_ATTACHMENTS_RESPONSE_FILENAME}"
             )
             write_string_to_file(
-                BLOB_CONTAINER, attachments_blob_path, json.dumps(attachments)
+                BLOB_CONTAINER, attachments_blob_path, json_serialize(attachments)
             )
 
             logger.info(
@@ -156,7 +157,7 @@ def process_email_change_notifications():
 
         logger.debug(msgraph_response)
 
-        msgraph_response = json.loads(msgraph_response)
+        msgraph_response = json_load(msgraph_response)
 
         email_sender = msgraph_response["sender"]["emailAddress"]["address"]
 
@@ -195,7 +196,7 @@ def process_email_change_notifications():
 
         base_path = f"{run_id}/{email_id}"
 
-        msgraph_response = json.loads(
+        msgraph_response = json_load(
             read_file_as_string(
                 container_name=BLOB_CONTAINER,
                 blob_name=f"{base_path}/{GRAPH_EMAIL_RESPONSE_FILENAME}",
@@ -207,7 +208,7 @@ def process_email_change_notifications():
         attachments_text = []
         attachments_for_email = []
         if msgraph_response["hasAttachments"]:
-            msgraph_attachments_response = json.loads(
+            msgraph_attachments_response = json_load(
                 read_file_as_string(
                     container_name=BLOB_CONTAINER,
                     blob_name=f"{base_path}/{GRAPH_ATTACHMENTS_RESPONSE_FILENAME}",
@@ -263,7 +264,7 @@ def process_email_change_notifications():
         write_string_to_file(
             container_name=BLOB_CONTAINER,
             blob_name=email_object_path,
-            string_data=json.dumps(email_object),
+            string_data=json_serialize(email_object),
         )
 
         return email_object_path
@@ -278,7 +279,7 @@ def process_email_change_notifications():
                                      of the email to be sent
         """
         logging.info("Sending LLM enriched email")
-        email_details = json.loads(
+        email_details = json_load(
             read_file_as_string(BLOB_CONTAINER, email_object_path)
         )
 

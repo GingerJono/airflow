@@ -60,8 +60,8 @@ Note that variables defined through environment variables are not visible in the
 
 Connections must be set up manually through the UI. There are two connections that may be required for local development testing:
 
-- `microsoft_graph`: connection to Microsoft Graph, using for interacting with the subscription for the email monitoring DAGs
-- `wasb`: connection to Azure Blob Storage, used for saving data between tasks.
+* `microsoft_graph`: connection to Microsoft Graph, using for interacting with the subscription for the email monitoring DAGs
+* `wasb`: connection to Azure Blob Storage, used for saving data between tasks.
 
 See [connections table](#connections)
 
@@ -72,6 +72,16 @@ If your local set up gets messed up you'll likely find the best thing to do is t
 ```sh
 docker compose down --volumes --remove-orphans
 ```
+
+## Writing DAGs
+
+Airflow provides a number of [best practices](https://airflow.apache.org/docs/apache-airflow/stable/best-practices.html) which should be considered when writing DAGs and generally working with Airflow.
+
+Some particular best practices and conventions for this codebase:
+
+* Prefer using the [TaskFlow API](https://airflow.apache.org/docs/apache-airflow/stable/tutorial/taskflow.html) style of writing DAGs, using annotated methods over use of traditional Operators where possible
+* Avoid expensive top level imports, e.g. of modules like `pandas`
+  * Use specific imports to reduce the expense of top-level imports, e.g. `from pandas import read_excel`
 
 ## Deploying Airflow to Azure
 
@@ -198,8 +208,8 @@ Variables are set in the UI at Admin > Variables
 
 Connections are set in the UI at Admin > Connections
 
-| Connection ID     | Connection Type                 | Configuration                                                                                                                                                                                                                                                      | Purpose                                                                                |
-| ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| microsoft_graph   | `msgraph` (Microsoft Graph API) | Client ID: From key vault secret `email-monitoring-client-id`</br>Client Secret: From key vault secret `email-monitoring-client-secret`</br>Tenant ID: cd4ffd59-5c74-4b7a-b992-9fc58efba60c</br>API Version: v1.0</br>Scopes: https://graph.microsoft.com/.default | Connection to Microsoft Graph, used for requests relating to the mailbox subscription. |
-| wasb              | `wasb` (Azure Blob Storage)     | SAS Token: In the Azure Portal generate a SAS Token copy the `Blob service SAS URL` into the `SAS Token` field                                                                                                                                                     | Connection to Azure Blob storage, used for saving data to blobs to pass between tags.  |
-| wasb-airflow-logs | `wasb` (Azure Blob Storage)     | Same as wasb connection                                                                                                                                                                                                                                            | Connection to Azure Blob storage, used for reading and writing logs from/to blobs.     |
+| Connection ID     | Connection Type                 | Configuration                                                                                                                                                                                                                                                            | Purpose                                                                                |
+| ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| microsoft_graph   | `msgraph` (Microsoft Graph API) | Client ID: From key vault secret `email-monitoring-client-id`</br>Client Secret: From key vault secret `email-monitoring-client-secret`</br>Tenant ID: `cd4ffd59-5c74-4b7a-b992-9fc58efba60c`</br>API Version: `v1.0`</br>Scopes: `https://graph.microsoft.com/.default` | Connection to Microsoft Graph, used for requests relating to the mailbox subscription. |
+| wasb              | `wasb` (Azure Blob Storage)     | SAS Token: In the Azure Portal generate a SAS Token copy the `Blob service SAS URL` into the `SAS Token` field                                                                                                                                                           | Connection to Azure Blob storage, used for saving data to blobs to pass between tags.  |
+| wasb-airflow-logs | `wasb` (Azure Blob Storage)     | Same as wasb connection                                                                                                                                                                                                                                                  | Connection to Azure Blob storage, used for reading and writing logs from/to blobs.     |
