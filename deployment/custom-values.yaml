@@ -6,7 +6,7 @@ airflow:
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/configuration/airflow-version.md
   image:
     repository: commondalintairflowcontainerregistry.azurecr.io/dalint-airflow
-    tag: "1e874062be42965bc4ef8cb30d2a5df0e3990f1d"
+    tag: "80d5287f9b6f2beafc0dd3a7c3276715b748e799"
     
     ## WARNING: even if set to "Always" DO NOT reuse tag names, 
     ##          containers only pull the latest image when restarting
@@ -131,11 +131,155 @@ airflow:
       
   ## a list airflow connections to create
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-connections.md
-  connections: []
+  connections:
+    - id: "wasb-airflow-logs"
+      type: "wasb"
+      description: "Azure Blob Storage connection for logging"
+      ## this string template is defined by `airflow.connectionsTemplates.CLIENT_ID`
+      login: "${CLIENT_ID}"
+      ## this string template is defined by `airflow.connectionsTemplates.AIRFLOW_STORAGE_HOST`
+      host: "${AIRFLOW_STORAGE_HOST}"
+      ## this string template is defined by `airflow.connectionsTemplates.CLIENT_SECRET`
+      password: "${CLIENT_SECRET}"
+      ## this string template is defined by `airflow.connectionsTemplates.TENANT_ID`
+      extra: |
+        {
+          "extra__wasb__tenant_id": "${TENANT_ID}"
+        }
+        
+    - id: "wasb"
+      type: "wasb"
+      description: "Azure Blob Storage connection for storing data between tasks."
+      ## this string template is defined by `airflow.connectionsTemplates.CLIENT_ID`
+      login: "${CLIENT_ID}"
+      ## this string template is defined by `airflow.connectionsTemplates.AIRFLOW_STORAGE_HOST`
+      host: "${AIRFLOW_STORAGE_HOST}"
+      ## this string template is defined by `airflow.connectionsTemplates.CLIENT_SECRET`
+      password: "${CLIENT_SECRET}"
+      ## this string template is defined by `airflow.connectionsTemplates.TENANT_ID`
+      extra: |
+        {
+          "extra__wasb__tenant_id": "${TENANT_ID}"
+        }
+        
+    - id: "microsoft_graph"
+      type: "msgraph"
+      description: "Microsoft Graph connection for interacting with Emails."
+      
+      login: "${MS_GRAPH_CLIENT_ID}"
+      password: "${MS_GRAPH_CLIENT_SECRET}"
+      
+      extra: |
+        {
+          "tenant_id": "${TENANT_ID}",
+          "api_version": "v1.0",
+          "extra__msgraph__scopes": "[\"https://graph.microsoft.com/.default\"]"
+        }
+
+      client_id:
+      client_secret:
+      tenant_id:
+      api_version:
+      scopes:
+        
+  connectionsTemplates:
+    ## extracts the value of client_id from `Secret/azure-storage-connection-details`
+    CLIENT_ID:
+      kind: "secret"
+      name: "azure-storage-connection-details"
+      key: "client_id"
+      
+    ## extracts the value of client_secret from `Secret/azure-storage-connection-details`
+    CLIENT_SECRET:
+      kind: "secret"
+      name: "azure-storage-connection-details"
+      key: "client_secret"
+      
+    ## extracts the value of tenant_id from `Secret/azure-storage-connection-details`
+    TENANT_ID:
+      kind: "secret"
+      name: "azure-storage-connection-details"
+      key: "tenant_id"
+      
+    ## extracts the value of subscription_id from `Secret/azure-storage-connection-details`
+    SUBSCRIPTION_ID:
+      kind: "secret"
+      name: "azure-storage-connection-details"
+      key: "subscription_id"
+      
+      
+    ## extracts the value of blob_host from `ConfigMap/airflow-storage`
+    AIRFLOW_STORAGE_HOST:
+      kind: "configmap"
+      name: "airflow-storage"
+      key: "blob_host"
+      
+    ## extracts the value of client_id from `Secret/msgraph-connection-details`
+    MS_GRAPH_CLIENT_ID:
+      kind: "secret"
+      name: "msgraph-connection-details"
+      key: "client_id"
+      
+    ## extracts the value of client_secret from `Secret/msgraph-connection-details`
+    MS_GRAPH_CLIENT_SECRET:
+      kind: "secret"
+      name: "msgraph-connection-details"
+      key: "client_secret"
+      
+    ## extracts the value of tenant_id from `Secret/msgraph-connection-details`
+    MS_GRAPH_TENANT_ID:
+      kind: "secret"
+      name: "msgraph-connection-details"
+      key: "tenant_id"
+      
 
   ## a list airflow variables to create
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-variables.md
-  variables: []
+  variables: 
+    - key: "email_monitoring_mailbox"
+      value: "${EMAIL_MONITORING_MAILBOX}"
+    - key: "email_monitoring_client_state"
+      value: "${EMAIL_MONITORING_CLIENT_STATE}"
+    - key: "email_monitoring_apim_change_notification_url"
+      value: "${EMAIL_MONITORING_CHANGE_NOTIFICATION_URL}"
+    - key: "email_monitoring_apim_lifecycle_notification_url"
+      value: "${EMAIL_MONITORING_LIFECYCLE_NOTIFICATION_URL}"
+    - key: "azureai_api_key"
+      value: "${AZUREAI_API_KEY}"
+    - key: "azureai_endpoint"
+      value: "${AZUREAI_ENDPOINT}"
+      
+  variablesTemplates:
+  
+    EMAIL_MONITORING_MAILBOX:
+      kind: configmap
+      name: email-monitoring-subscription-details
+      key: mailbox
+    
+    EMAIL_MONITORING_CLIENT_STATE:
+      kind: configmap
+      name: email-monitoring-subscription-details
+      key: client_state
+    
+    EMAIL_MONITORING_CHANGE_NOTIFICATION_URL:
+      kind: configmap
+      name: email-monitoring-subscription-details
+      key: change_notification_url
+    
+    EMAIL_MONITORING_LIFECYCLE_NOTIFICATION_URL:
+      kind: configmap
+      name: email-monitoring-subscription-details
+      key: lifecycle_notification_url
+      
+    AZUREAI_API_KEY:
+      kind: configmap
+      name: azureai-connection-details
+      key: api_key
+
+    AZUREAI_ENDPOINT:
+      kind: configmap
+      name: azureai-connection-details
+      key: endpoint
 
   ## a list airflow pools to create
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-pools.md
