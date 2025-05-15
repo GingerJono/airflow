@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 @dag(
     schedule="@daily",
     start_date=datetime(2025, 4, 1),
+    catchup=False,
     max_active_runs=1,
     default_args={
         "depends_on_past": False,

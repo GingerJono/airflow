@@ -188,11 +188,11 @@ The first time that Airflow is deployed to AKS, there are a couple of changes re
 
 ## Variables and Connections
 
-There are a number of variables and connections which must be configured in Airflow for the DAGs to work. At present these must be set manually in the UI, though in future we should update this so they are created through the custom-values.yaml file, pulling values from Kubernetes Secrets and ConfigMaps.
+There are a number of variables and connections which must be configured in Airflow for the DAGs to work. For the deployed environments these are configured in the custom-values.yaml file, pulling values from Kubernetes Secrets and ConfigMaps. When running airflow locally these must be manually set in the UI.
 
 ### Variables
 
-Variables are set in the UI at Admin > Variables
+Variables are set in the UI at Admin > Variables, and are set in custom-values.yaml in the `airflow.variables` property.
 
 | Variable Name                                    | Value                                                                                                                                      | Purpose                                                                                                                                                                                                                     |
 | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -206,7 +206,7 @@ Variables are set in the UI at Admin > Variables
 
 ### Connections
 
-Connections are set in the UI at Admin > Connections
+Connections are set in the UI at Admin > Connections, and are defined in custom-values.yaml in the `airflow.connections` property.
 
 | Connection ID     | Connection Type                 | Configuration                                                                                                                                                                                                                                                            | Purpose                                                                                |
 | ----------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
