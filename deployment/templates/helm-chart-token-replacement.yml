@@ -3,14 +3,11 @@ parameters:
   acrImageTag:
 
 steps:
-  - task: qetza.replacetokens.replacetokens-task.replacetokens@6
+  - task: qetza.replacetokens.replacetokens-task.replacetokens@3
     displayName: Replace tokens in Helm chart
     inputs:
-      sources: |
-        'deployment/custom-values-template.yaml'
-        '$(System.DefaultWorkingDirectory)/deployment/custom-values-template.yaml'
-        '$(Build.Repository.LocalPath)/deployment/custom-values-template.yaml'
-        '$(Build.SourcesDirectory)/deployment/custom-values-template.yaml'
+      targetFiles: |
+        $(System.DefaultWorkingDirectory)/deployment/custom-values-template.yaml
       ifNoFilesFound: 'error'
       logLevel: 'debug'
     env:
