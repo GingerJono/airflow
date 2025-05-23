@@ -15,7 +15,7 @@ jobs:
         deploy:
           steps:
             - download: "current"
-              artifact: "helm-config"
+              artifact: "HelmConfig"
             - task: "KubectlInstaller@0"
             - task: "HelmInstaller@1"
             - task: "Kubernetes@1"
@@ -46,4 +46,4 @@ jobs:
                 chartType: "Name"
                 chartName: "${{ parameters.helmRepoName }}/airflow"
                 install: true
-                valueFiles: "$(Pipeline.Workspace)/helm-config/helm_config.yaml"
+                valueFiles: "$(Pipeline.Workspace)/HelmConfig/custom-values-template.yaml"

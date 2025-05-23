@@ -62,6 +62,7 @@ stages:
           acrImageTag: "$(acrImageTag)"
           
       - template: templates/helm-upgrade.yml
+        dependsOn: ReplaceTokens
         parameters:
           environment: "Development"
           helmReleaseName: "$(helmReleaseName)"

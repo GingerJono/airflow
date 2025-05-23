@@ -10,11 +10,16 @@ jobs:
         displayName: Replace tokens in Helm chart
         inputs:
           sources: |
-            '$(System.DefaultWorkingDirectory)/helm-chart/custom-values-template.yaml'
+            'deployment/custom-values-template.yaml'
+            '$(System.DefaultWorkingDirectory)/deployment/custom-values-template.yaml'
+            '$(Build.Repository.LocalPath)/deployment/custom-values-template.yaml'
+            '$(Build.SourcesDirectory)/deployment/custom-values-template.yaml'
+          ifNoFilesFound: 'error'
+          logLevel: 'debug'
         env:
           ACR_IMAGE_REPOSITORY: ${{ parameters.acrImageRepository }}
           ACR_IMAGE_TAG: ${{ parameters.acrImageTag }}
           
-      - publish: '$(System.DefaultWorkingDirectory)/helm-chart/custom-values-template.yaml'
+      - publish: '$(Build.SourcesDirectory)/deployment/custom-values-template.yaml'
         displayName: Publish Helm custom values yaml for later use
-        artifact: 'helm_config.yaml'
+        artifact: 'HelmConfig'

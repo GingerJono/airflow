@@ -13,7 +13,7 @@ jobs:
         command: build
         containerRegistry: ${{ parameters.serviceConnectionName }}
         repository: ${{ parameters.acrImageRepository }}
-        dockerfile: "$(System.DefaultWorkingDirectory)/Dockerfile"
+        dockerfile: '$(Build.SourcesDirectory)/Dockerfile'
         tags: |
           ${{ parameters.acrImageTag }}
           latest
