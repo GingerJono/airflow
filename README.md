@@ -102,7 +102,7 @@ Prerequisites:
 * Azure CLI
 * Docker
 
-### Build Docker Image and Deploy to Azure Container Registry
+#### Build Docker Image and Deploy to Azure Container Registry
 
 Our custom Docker image is defined in `Dockerfile`, and builds from the official airflow slim image. The docker image contains our DAG definitions, and therefore must be updated when we update DAGs.
 
@@ -133,7 +133,7 @@ The docker image tag is used to identify the correct image for the airflow deplo
    1. Set the `repository` value to be `commondalintairflowcontainerregistry.azurecr.io/dalint-airflow`
    2. Set the `tag` value to be the tag (i.e. `<git-hash>`) that you used for your image.
 
-### Update Airflow Deployment
+#### Update Airflow Deployment
 
 All instructions are written to be run from the root of this repo.
 
