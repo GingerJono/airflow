@@ -1,0 +1,28 @@
+parameters:
+  acrImageRepository:
+  acrImageTag:
+  serviceConnectionName:
+  
+jobs:
+- job: BuildAndPush
+  displayName: Build and Push Docker Image
+  steps:
+    - task: Docker@2
+      displayName: Build image
+      inputs:
+        command: build
+        containerRegistry: ${{ parameters.serviceConnectionName }}
+        repository: ${{ parameters.acrImageRepository }}
+        dockerfile: "$(System.DefaultWorkingDirectory)/Dockerfile"
+        tags: |
+          ${{ parameters.acrImageTag }}
+          latest
+    - task: Docker@2
+      displayName: Push image to container registry
+      inputs:
+        command: push
+        containerRegistry: ${{ parameters.serviceConnectionName }}
+        repository: ${{ parameters.acrImageRepository }}
+        tags: |
+          ${{ parameters.acrImageTag }}
+          latest

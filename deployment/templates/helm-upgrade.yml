@@ -1,0 +1,49 @@
+parameters:
+  helmRepoName:
+  helmReleaseName:
+  kubernetesNamespace:
+  connectionName:
+  environment:
+  
+
+jobs:
+  - deployment: HelmUpgrade
+    displayName: Upgrade Helm Chart
+    environment: ${{ parameters.environment }}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - download: "current"
+              artifact: "helm-config"
+            - task: "KubectlInstaller@0"
+            - task: "HelmInstaller@1"
+            - task: "Kubernetes@1"
+              inputs:
+                kubernetesServiceEndpoint: "${{ parameters.connectionName }}"
+                namespace: "${{ parameters.kubernetesNamespace }}"
+                command: "login"
+            - task: "HelmDeploy@0"
+              displayName: "Add Airflow repo to Helm"
+              inputs:
+                connectionType: "None"
+                command: "repo"
+                arguments: "add ${{ parameters.helmRepoName }} https://airflow-helm.github.io/charts"
+            - task: "HelmDeploy@0"
+              displayName: "Update Helm repo"
+              inputs:
+                connectionType: "None"
+                command: "repo"
+                arguments: "update"
+            - task: "HelmDeploy@0"
+              displayName: "Upgrade Helm Chart"
+              inputs:
+                connectionType: "Kubernetes Service Connection"
+                kubernetesServiceConnection: "${{ parameters.connectionName }}"
+                namespace: "${{ parameters.kubernetesNamespace }}"
+                command: "upgrade"
+                releaseName: "${{ parameters.helmReleaseName }}"
+                chartType: "Name"
+                chartName: "${{ parameters.helmRepoName }}/airflow"
+                install: true
+                valueFiles: "$(Pipeline.Workspace)/helm-config/helm_config.yaml"

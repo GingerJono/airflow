@@ -89,6 +89,12 @@ For the deployed environments we are hosting Airflow on Azure Kubernetes Service
 
 The deployment of the kubernetes cluster, and the creation of secrets are handled in the [infrastructure repo](https://dev.azure.com/DaleBI/DaleSoftwireIntegrationLayer/_git/infrastructure) for the project; this repository is responsible only for the deployment of Airflow onto the cluster.
 
+There is an Azure DevOps pipeline configured which carries out this deployment, generating a Docker image and deploying it. This is defined by the files in the `deployment` folder
+
+### Manual Deployment
+
+Airflow can be deployed manually if needed, but this should be rare and deployment through the pipeline preferred.  
+
 Prerequisites:
 
 * Helm 3.0+ ([installing helm](https://helm.sh/docs/intro/install/))
@@ -123,7 +129,9 @@ The docker image tag is used to identify the correct image for the airflow deplo
    docker push commondalintairflowcontainerregistry.azurecr.io/dalint-airflow:<git-hash>
    ```
 
-4. Update the file `deployment/custom-values.yaml` and set the `tag` value to be the tag (i.e. `<git-hash>`) that you used for your image.
+4. Update the file `deployment/custom-values-template.yaml`:
+   1. Set the `repository` value to be `commondalintairflowcontainerregistry.azurecr.io/dalint-airflow`
+   2. Set the `tag` value to be the tag (i.e. `<git-hash>`) that you used for your image.
 
 ### Update Airflow Deployment
 

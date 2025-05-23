@@ -5,8 +5,8 @@ airflow:
   ## configs for the airflow container image
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/configuration/airflow-version.md
   image:
-    repository: commondalintairflowcontainerregistry.azurecr.io/dalint-airflow
-    tag: "80d5287f9b6f2beafc0dd3a7c3276715b748e799"
+    repository: "#{ACR_SERVER}#/#{ACR_IMAGE_REPOSITORY}#"
+    tag: "#{ACR_IMAGE_TAG}#"
     
     ## WARNING: even if set to "Always" DO NOT reuse tag names, 
     ##          containers only pull the latest image when restarting
