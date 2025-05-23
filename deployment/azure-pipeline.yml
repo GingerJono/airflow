@@ -56,35 +56,56 @@ stages:
     # condition: and(succeeded(), eq(variables['isMain'], 'true'))
     condition: succeeded()
     jobs:
-      - template: templates/helm-chart-token-replacement.yml
-        parameters:
-          acrImageRepository: "$(acrImageRepository)"
-          acrImageTag: "$(acrImageTag)"
+      - job: ReplaceTokens
+        displayName: Replace Tokens in Helm Chart
+        steps:
+          - template: templates/helm-chart-token-replacement.yml
+            parameters:
+              acrImageRepository: "$(acrImageRepository)"
+              acrImageTag: "$(acrImageTag)"
           
-      - template: templates/helm-upgrade.yml
+      - deployment: HelmUpgrade
+        displayName: Upgrade Helm Chart
+        environment: Development
         dependsOn: ReplaceTokens
-        parameters:
-          environment: "Development"
-          helmReleaseName: "$(helmReleaseName)"
-          helmRepoName: "$(helmRepoName)"
-          kubernetesNamespace: "$(kubernetesNamespace)"
-          connectionName: "Dev Integration Layer K8s Cluster"
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/helm-upgrade.yml
+                  parameters:
+                    environment: "Development"
+                    helmReleaseName: "$(helmReleaseName)"
+                    helmRepoName: "$(helmRepoName)"
+                    kubernetesNamespace: "$(kubernetesNamespace)"
+                    connectionName: "Dev Integration Layer K8s Cluster"
   
   - stage: DeployProduction
     displayName: Deploy to Production
     dependsOn: DeployDevelopment
     condition: and(succeeded(), eq(variables['isMain'], 'true'))
     jobs:
-      - template: templates/helm-chart-token-replacement.yml
-        parameters:
-          acrImageRepository: "$(acrImageRepository)"
-          acrImageTag: "$(acrImageTag)"
+      - job: ReplaceTokens
+        displayName: Replace Tokens in Helm Chart for Production
+        steps:
+          - template: templates/helm-chart-token-replacement.yml
+            parameters:
+              acrImageRepository: "$(acrImageRepository)"
+              acrImageTag: "$(acrImageTag)"
           
-      - template: templates/helm-upgrade.yml
-        parameters:
-          environment: "Production"
-          helmReleaseName: "$(helmReleaseName)"
-          helmRepoName: "$(helmRepoName)"
-          kubernetesNamespace: "$(kubernetesNamespace)"
-          connectionName: "Prod Integration Layer K8s Cluster"
+      - deployment: HelmUpgrade
+        displayName: Upgrade Helm Chart for Production
+        environment: Production
+        dependsOn: ReplaceTokens
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/helm-upgrade.yml
+                  parameters:
+                    environment: "Production"
+                    helmReleaseName: "$(helmReleaseName)"
+                    helmRepoName: "$(helmRepoName)"
+                    kubernetesNamespace: "$(kubernetesNamespace)"
+                    connectionName: "Prod Integration Layer K8s Cluster"
            

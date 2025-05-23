@@ -2,24 +2,21 @@ parameters:
   acrImageRepository:
   acrImageTag:
 
-jobs:
-  - job: ReplaceTokens
-    displayName: Replace Tokens in Helm Chart
-    steps:
-      - task: qetza.replacetokens.replacetokens-task.replacetokens@6
-        displayName: Replace tokens in Helm chart
-        inputs:
-          sources: |
-            'deployment/custom-values-template.yaml'
-            '$(System.DefaultWorkingDirectory)/deployment/custom-values-template.yaml'
-            '$(Build.Repository.LocalPath)/deployment/custom-values-template.yaml'
-            '$(Build.SourcesDirectory)/deployment/custom-values-template.yaml'
-          ifNoFilesFound: 'error'
-          logLevel: 'debug'
-        env:
-          ACR_IMAGE_REPOSITORY: ${{ parameters.acrImageRepository }}
-          ACR_IMAGE_TAG: ${{ parameters.acrImageTag }}
-          
-      - publish: '$(Build.SourcesDirectory)/deployment/custom-values-template.yaml'
-        displayName: Publish Helm custom values yaml for later use
-        artifact: 'HelmConfig'
+steps:
+  - task: qetza.replacetokens.replacetokens-task.replacetokens@6
+    displayName: Replace tokens in Helm chart
+    inputs:
+      sources: |
+        'deployment/custom-values-template.yaml'
+        '$(System.DefaultWorkingDirectory)/deployment/custom-values-template.yaml'
+        '$(Build.Repository.LocalPath)/deployment/custom-values-template.yaml'
+        '$(Build.SourcesDirectory)/deployment/custom-values-template.yaml'
+      ifNoFilesFound: 'error'
+      logLevel: 'debug'
+    env:
+      ACR_IMAGE_REPOSITORY: ${{ parameters.acrImageRepository }}
+      ACR_IMAGE_TAG: ${{ parameters.acrImageTag }}
+      
+  - publish: '$(Build.SourcesDirectory)/deployment/custom-values-template.yaml'
+    displayName: Publish Helm custom values yaml for later use
+    artifact: 'HelmConfig'
