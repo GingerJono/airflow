@@ -8,7 +8,7 @@ variables:
   pythonVersion: '3.12'
   acrServiceConnectionName: 'Integration Layer Airflow Container Registry'
   acrImageRepository: 'dalint-airflow'
-  acrImageTag: "pipeline-$(Build.BuildId)"
+  acrImageTag: "pipeline-$(Build.SourceVersion)-$(Build.BuildNumber)"
   helmReleaseName: 'airflow'
   helmRepoName: 'airflow-stable'
   kubernetesNamespace: 'integration-layer-airflow'
@@ -53,7 +53,8 @@ stages:
   - stage: DeployDevelopment
     displayName: Deploy to Development
     dependsOn: CI
-    condition: and(succeeded(), eq(variables['isMain'], 'true'))
+    # condition: and(succeeded(), eq(variables['isMain'], 'true'))
+    condition: succeeded()
     jobs:
       - template: templates/helm-chart-token-replacement.yml
         parameters:
