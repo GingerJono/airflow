@@ -1,0 +1,111 @@
+trigger:
+  branches:
+    include:
+      - '*'
+      
+variables:
+  isMain: $[eq(variables['Build.SourceBranch'], 'refs/heads/main')]
+  pythonVersion: '3.12'
+  acrServiceConnectionName: 'Integration Layer Airflow Container Registry'
+  acrImageRepository: 'dalint-airflow'
+  acrImageTag: "pipeline-$(Build.SourceVersion)-$(Build.BuildNumber)"
+  helmReleaseName: 'airflow'
+  helmRepoName: 'airflow-stable'
+  kubernetesNamespace: 'integration-layer-airflow'
+  
+  
+pool: "Dale Integration Layer Agent Pool"
+
+stages:
+  - stage: CI
+    jobs:
+      - job: RunLinter
+        displayName: 'Run Linter'
+        steps:
+          - script: |
+              curl -LsSf https://astral.sh/uv/0.7.6/install.sh | bash
+              echo "##vso[task.prependpath]$HOME/.local/bin"
+            displayName: Install uv
+
+          - script: |
+              uv python install $(pythonVersion)
+            displayName: Install Python $(pythonVersion)
+
+          - script: |
+              uv sync -p $(pythonVersion) --only-dev
+            displayName: "Install dependencies"
+            
+          - script: |
+              uv run ruff check
+            displayName: 'Run ruff check'
+            
+          - script: |
+              uv run ruff format --check
+            displayName: 'Run ruff format'
+
+      - template: templates/build-docker-image.yml
+        # condition: equals(variables['isMain'], 'true')
+        parameters:
+          acrImageRepository: "$(acrImageRepository)"
+          acrImageTag: "$(acrImageTag)"
+          serviceConnectionName: "$(acrServiceConnectionName)"
+  
+  - stage: DeployDevelopment
+    displayName: Deploy to Development
+    dependsOn: CI
+    # condition: and(succeeded(), eq(variables['isMain'], 'true'))
+    condition: succeeded()
+    jobs:
+      - job: ReplaceTokens
+        displayName: Replace Tokens in Helm Chart
+        steps:
+          - template: templates/helm-chart-token-replacement.yml
+            parameters:
+              acrImageRepository: "$(acrImageRepository)"
+              acrImageTag: "$(acrImageTag)"
+          
+      - deployment: HelmUpgrade
+        displayName: Upgrade Helm Chart
+        environment: Development
+        dependsOn: ReplaceTokens
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/helm-upgrade.yml
+                  parameters:
+                    environment: "Development"
+                    helmReleaseName: "$(helmReleaseName)"
+                    helmRepoName: "$(helmRepoName)"
+                    kubernetesNamespace: "$(kubernetesNamespace)"
+                    connectionName: "Dev Integration Layer K8s Cluster"
+  
+  - stage: DeployProduction
+    displayName: Deploy to Production
+    dependsOn: DeployDevelopment
+    condition: and(succeeded(), eq(variables['isMain'], 'true'))
+    jobs:
+      - job: ReplaceTokens
+        displayName: Replace Tokens in Helm Chart for Production
+        steps:
+          - template: templates/helm-chart-token-replacement.yml
+            parameters:
+              acrImageRepository: "$(acrImageRepository)"
+              acrImageTag: "$(acrImageTag)"
+          
+      - deployment: HelmUpgrade
+        displayName: Upgrade Helm Chart for Production
+        environment: Production
+        dependsOn: ReplaceTokens
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/helm-upgrade.yml
+                  parameters:
+                    environment: "Production"
+                    helmReleaseName: "$(helmReleaseName)"
+                    helmRepoName: "$(helmRepoName)"
+                    kubernetesNamespace: "$(kubernetesNamespace)"
+                    connectionName: "Prod Integration Layer K8s Cluster"
+           
