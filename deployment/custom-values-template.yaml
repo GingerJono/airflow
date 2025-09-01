@@ -97,6 +97,24 @@ airflow:
       email: conor.bleakley@softwire.com
       firstName: Conor
       lastName: Bleakley
+
+    - username: cristina-matei
+      password: ${CRISTINA_PASSWORD}
+      role: 
+       - User
+       - Op
+      email: cristina.matei@softwire.com
+      firstName: Cristina
+      lastName: Matei
+
+    - username: claire-li
+      password: ${CLAIRE_PASSWORD}
+      role: 
+       - User
+       - Op
+      email: claire.li@softwire.com
+      firstName: Claire
+      lastName: Li
   
   usersTemplates:
     ADMIN_PASSWORD:
@@ -127,6 +145,16 @@ airflow:
     CONOR_PASSWORD:
       kind: secret
       name: conor-bleakley-user-details
+      key: password
+
+    CRISTINA_PASSWORD:
+      kind: secret
+      name: cristina-matei-user-details
+      key: password
+
+    CLAIRE_PASSWORD:
+      kind: secret
+      name: claire-li-user-details
       key: password
       
   ## a list airflow connections to create
