@@ -44,7 +44,6 @@ stages:
             displayName: 'Run ruff format'
 
       - template: templates/build-docker-image.yml
-        condition: equals(variables['isMain'], 'true')
         parameters:
           acrImageRepository: "$(acrImageRepository)"
           acrImageTag: "$(acrImageTag)"
@@ -54,7 +53,6 @@ stages:
     displayName: Deploy to Development
     dependsOn: CI
     condition: and(succeeded(), eq(variables['isMain'], 'true'))
-    condition: succeeded()
     jobs:
       - job: ReplaceTokens
         displayName: Replace Tokens in Helm Chart

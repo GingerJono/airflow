@@ -6,6 +6,7 @@ parameters:
 jobs:
 - job: BuildAndPush
   displayName: Build and Push Docker Image
+  condition: eq(variables['isMain'], 'true')
   steps:
     - task: Docker@2
       displayName: Build image
