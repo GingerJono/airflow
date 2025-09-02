@@ -44,7 +44,7 @@ stages:
             displayName: 'Run ruff format'
 
       - template: templates/build-docker-image.yml
-        # condition: equals(variables['isMain'], 'true')
+        condition: equals(variables['isMain'], 'true')
         parameters:
           acrImageRepository: "$(acrImageRepository)"
           acrImageTag: "$(acrImageTag)"
@@ -53,7 +53,7 @@ stages:
   - stage: DeployDevelopment
     displayName: Deploy to Development
     dependsOn: CI
-    # condition: and(succeeded(), eq(variables['isMain'], 'true'))
+    condition: and(succeeded(), eq(variables['isMain'], 'true'))
     condition: succeeded()
     jobs:
       - job: ReplaceTokens
