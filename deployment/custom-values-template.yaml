@@ -223,6 +223,19 @@ airflow:
       tenant_id:
       api_version:
       scopes:
+
+    - id: "cytora"
+      type: "cytora"
+      description: "Cytora connection"
+
+      login: "${CYTORA_CLIENT_ID}"
+      password: "${CYTORA_CLIENT_SECRET}"
+      extra: |
+        {
+          "region": "${CYTORA_REGION}"
+          "workspace": "${CYTORA_WORKSPACE}"
+        }
+
         
   connectionsTemplates:
     ## extracts the value of client_id from `Secret/azure-storage-connection-details`
@@ -273,7 +286,26 @@ airflow:
       kind: "secret"
       name: "msgraph-connection-details"
       key: "tenant_id"
-      
+
+    CYTORA_CLIENT_ID:
+      kind: "secret"
+      name: "cytora-connection-credentials"
+      key: "client_id"
+
+    CYTORA_CLIENT_SECRET:
+      kind: "secret"
+      name: "cytora-connection-credentials"
+      key: "client_secret"
+
+    CYTORA_REGION:
+      kind: "configmap"
+      name: "cytora-connection-configs"
+      key: "region"
+
+    CYTORA_WORKSPACE:
+      kind: "configmap"
+      name: "cytora-connection-configs"
+      key: "workspace"
 
   ## a list airflow variables to create
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-variables.md
