@@ -115,6 +115,15 @@ airflow:
       email: claire.li@softwire.com
       firstName: Claire
       lastName: Li
+
+    - username: laura-hughes
+      password: ${LAURA_PASSWORD}
+      role:
+        - User
+        - Op
+      email: laura.hughes@softwire.com
+      firstName: Laura
+      lastName: Hughes
   
   usersTemplates:
     ADMIN_PASSWORD:
@@ -155,6 +164,11 @@ airflow:
     CLAIRE_PASSWORD:
       kind: secret
       name: claire-li-user-details
+      key: password
+
+    LAURA_PASSWORD:
+      kind: secret
+      name: laura-hughes-user-details
       key: password
       
   ## a list airflow connections to create
