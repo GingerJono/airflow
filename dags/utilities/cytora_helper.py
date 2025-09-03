@@ -8,6 +8,7 @@ CYTORA_CONNECTION_ID = "cytora"
 
 logger = logging.getLogger(__name__)
 
+
 class CytoraHook:
     def __init__(self, schema_config_id: str, conn_id=CYTORA_CONNECTION_ID):
         self.schema_config_id = schema_config_id
@@ -23,10 +24,7 @@ class CytoraHook:
 
     def _authenticate(self):
         url = "https://token.cytora.com/oauth/token"
-        headers = {
-            "accept": "application/json",
-            "content-type": "application/json"
-        }
+        headers = {"accept": "application/json", "content-type": "application/json"}
         payload = {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
