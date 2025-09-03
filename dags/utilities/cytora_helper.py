@@ -1,8 +1,8 @@
 import logging
 import time
 
-from airflow.hooks.base import BaseHook
 import requests
+from airflow.hooks.base import BaseHook
 
 CYTORA_CONNECTION_ID = "cytora"
 
