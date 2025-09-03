@@ -225,7 +225,7 @@ airflow:
       scopes:
 
     - id: "cytora"
-      type: "cytora"
+      type: "generic"
       description: "Cytora connection"
 
       login: "${CYTORA_CLIENT_ID}"
