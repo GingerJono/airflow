@@ -5,6 +5,7 @@ import requests
 from airflow.hooks.base import BaseHook
 
 CYTORA_CONNECTION_ID = "cytora"
+CYTORA_AUTH_URL = "https://token.cytora.com/oauth/token"
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class CytoraHook:
 
         self.client_id = self.conn.login
         self.client_secret = self.conn.password
+        self.auth_audience = self.conn.extra_dejson["auth_audience"]
 
         self.token = None
         self.token_expiry = 0
@@ -23,16 +25,15 @@ class CytoraHook:
         self._authenticate()
 
     def _authenticate(self):
-        url = "https://token.cytora.com/oauth/token"
         headers = {"accept": "application/json", "content-type": "application/json"}
         payload = {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
-            "audience": "https://gateway.cytora-prod.com",
+            "audience": self.auth_audience,
             "grant_type": "client_credentials",
         }
 
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(CYTORA_AUTH_URL, headers=headers, json=payload)
         response.raise_for_status()
 
         data = response.json()
