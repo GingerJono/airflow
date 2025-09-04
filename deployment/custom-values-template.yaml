@@ -225,7 +225,7 @@ airflow:
       scopes:
 
     - id: "cytora"
-      type: "cytora"
+      type: "generic"
       description: "Cytora connection"
 
       login: "${CYTORA_CLIENT_ID}"
@@ -234,6 +234,7 @@ airflow:
         {
           "region": "${CYTORA_REGION}"
           "workspace": "${CYTORA_WORKSPACE}"
+          "auth_audience": "${CYTORA_AUTH_AUDIENCE}"
         }
 
         
@@ -306,6 +307,11 @@ airflow:
       kind: "configmap"
       name: "cytora-connection-configs"
       key: "workspace"
+
+    CYTORA_AUTH_AUDIENCE:
+      kind: "configmap"
+      name: "cytora-connection-configs"
+      key: "auth_audience"
 
   ## a list airflow variables to create
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-variables.md
