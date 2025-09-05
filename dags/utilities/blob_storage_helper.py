@@ -24,7 +24,25 @@ def write_string_to_file(container_name: str, blob_name: str, string_data: str):
     )
 
 
+def write_bytes_to_file(container_name: str, blob_name: str, bytes_data: bytes):
+    logger.info("Preparing to write bytes to blob %s", blob_name)
+    conn = WasbHook(wasb_conn_id=WASB_CONNECTION_ID)
+    conn.upload(
+        container_name=container_name,
+        blob_name=blob_name,
+        data=bytes_data,
+        create_container=False,
+    )
+
+
 def read_file_as_string(container_name: str, blob_name: str) -> str:
     logger.info("Preparing to read blob as string %s", blob_name)
     conn = WasbHook(wasb_conn_id=WASB_CONNECTION_ID)
     return conn.read_file(container_name=container_name, blob_name=blob_name)
+
+
+def read_file_as_bytes(container_name: str, blob_name: str) -> bytes:
+    logger.info("Preparing to read blob as bytes %s", blob_name)
+    conn = WasbHook(wasb_conn_id=WASB_CONNECTION_ID)
+    downloader = conn.download(container_name=container_name, blob_name=blob_name)
+    return downloader.readall()

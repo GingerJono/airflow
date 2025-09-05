@@ -1,41 +1,72 @@
+import json
 import logging
-from datetime import timedelta
-from json import dumps as json_serialize
-from json import loads as json_load
+import os
+from datetime import timedelta, datetime
 
-import markdown as md
 from airflow.decorators import dag, task
 from airflow.exceptions import AirflowFailException
 from airflow.models import Variable
 from airflow.models.dagrun import DagRun
 from airflow.models.param import Param
-from airflow.operators.empty import EmptyOperator
-from html2text import html2text
 from utilities.blob_storage_helper import (
     read_file_as_string,
+    read_file_as_bytes,
     write_string_to_file,
+    write_bytes_to_file,
 )
 from utilities.email_attachments_helper import get_attachments_text
 from utilities.msgraph_helper import (
+    get_eml_file_from_email_id,
     get_attachments_from_email_id,
     get_email_from_id,
     send_email,
 )
 from utilities.open_ai_helper import get_llm_chat_response
 
+from utilities.cytora_helper import CytoraHook
+
 NUM_RETRIES = 2
 RETRY_DELAY_MINS = 3
 
 
 BLOB_CONTAINER = "email-monitoring-data"
+OUTPUT_BLOB_CONTAINER = "cytora-output"
 
 GRAPH_EMAIL_RESPONSE_FILENAME = "graph_message_response_raw"
+GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME = "graph_message_eml_response_raw"
 GRAPH_ATTACHMENTS_RESPONSE_FILENAME = "graph_attachments_response_raw"
 LLM_RESPONSE_FILENAME = "llm_response"
 EMAIL_RESPONSE_FILENAME = "email_response"
+MEDIA_TYPE = "application/vnd.ms-outlook"
+SCHEMA_MAIN = "ds:cfg:wr2pxXtxctBgFaZP"
+
+OUTPUTS_PREFIX = "outputs"
 
 logger = logging.getLogger(__name__)
 
+
+def upload_stream_to_cytora(email_id: str, media_type: str, cytora_instance: CytoraHook, dag_run_id: str = None):
+    file_bytes = read_file_as_bytes(
+        container_name=BLOB_CONTAINER,
+        blob_name=f"{dag_run_id}/{email_id}/{GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME}",
+    )
+    upload_url, upload_id = cytora_instance.get_presigned_url()
+    status = cytora_instance.upload_file(upload_url, file_stream=file_bytes, content_type=media_type)
+    return status, upload_id
+
+def start_cytora_job(cytora_instance: CytoraHook, upload_id: str, file_name: str, media_type: str):
+    file_id = cytora_instance.create_file(upload_id, file_name, media_type)
+    job_name = f"API {datetime.now().strftime('%Y%m%d')}: {file_name}"
+    job_id = cytora_instance.create_schema_job(file_id, job_name)
+    return job_id, file_id
+
+def save_cytora_output_to_blob_storage(output: dict, key_prefix:str):
+    ts = datetime.now().strftime('%Y%m%d%H%M%S%f')[:-3]
+    output["TimeProcessed"] = ts
+    key = f"{key_prefix}/{ts}_{output['job_id']}.json"
+    output_json = json.dumps(output, indent=2)
+    write_string_to_file(OUTPUT_BLOB_CONTAINER, key, output_json)
+    return key
 
 @dag(
     params={"email_ids": Param(["email-1", "email-2"], type="array")},
@@ -69,9 +100,9 @@ def process_email_change_notifications():
         return email_ids
 
     @task
-    def get_email_content(email_id: str, dag_run: DagRun | None = None):
+    def get_email_eml_file(email_id: str, dag_run: DagRun | None = None):
         """
-        Retrieves the content of an email from MS Graph, and saves the raw response
+        Retrieves the eml file of an email from MS Graph, and saves the raw response
         to Azure Blob Storage.
 
         Args:
@@ -80,246 +111,61 @@ def process_email_change_notifications():
         logger.info("Retrieving email with id %s", email_id)
 
         mailbox = Variable.get("email_monitoring_mailbox")
-        result = get_email_from_id(email_id=email_id, mailbox=mailbox)
+        result = get_eml_file_from_email_id(email_id=email_id, mailbox=mailbox)
 
-        logger.info("Saving email content to blob storage...")
+        # This replaces the eml file with a msg file from local file system
+        dag_dir = os.path.dirname(__file__)
+        file_path = os.path.join(dag_dir, "test_dev_mailbox.msg")
+
+        with open(file_path, "rb") as f:
+            msg_bytes = f.read()
+
+        logger.info("Saving email eml file to blob storage...")
         run_id = dag_run.run_id
 
-        email_blob_path = f"{run_id}/{email_id}/{GRAPH_EMAIL_RESPONSE_FILENAME}"
+        email_blob_path = f"{run_id}/{email_id}/{GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME}"
 
-        write_string_to_file(BLOB_CONTAINER, email_blob_path, json_serialize(result))
+        write_bytes_to_file(BLOB_CONTAINER, email_blob_path, msg_bytes)
 
-        logger.info("Email content saved to blob storage: %s", email_blob_path)
+        logger.info("Email eml file saved to blob storage: %s", email_blob_path)
 
     @task
-    def get_email_attachments(email_id: str, dag_run: DagRun | None = None):
-        """
-        Retrieves the content of files attached to an email from MS Graph,
-        and saves the raw response to Azure Blob Storage.
-
-        Args:
-            email_id (str): The id of the email to retrieve the attachments
-            of from MS Graph
-        """
+    def upload_file_for_cytora_main_job(email_id: str, dag_run: DagRun | None = None):
         run_id = dag_run.run_id
+        cytora_main = CytoraHook(SCHEMA_MAIN)
+        status, upload_id = upload_stream_to_cytora(email_id=email_id, media_type=MEDIA_TYPE, cytora_instance = cytora_main, dag_run_id=run_id)
+        if status != 200:
+            logger.error("UploadFailed", f"Upload to Cytora returned HTTP {status}")
+            raise RuntimeError(f"Upload failed: {status}")
 
-        msgraph_response = json_load(
-            read_file_as_string(
-                container_name=BLOB_CONTAINER,
-                blob_name=f"{run_id}/{email_id}/{GRAPH_EMAIL_RESPONSE_FILENAME}",
-            )
-        )
-
-        if msgraph_response["hasAttachments"]:
-            logger.info("Retrieving attachments for email with id %s", email_id)
-            mailbox = Variable.get("email_monitoring_mailbox")
-            attachments = get_attachments_from_email_id(
-                email_id=email_id, mailbox=mailbox
-            )
-
-            logger.info("Saving email attachments to blob storage...")
-            attachments_blob_path = (
-                f"{run_id}/{email_id}/{GRAPH_ATTACHMENTS_RESPONSE_FILENAME}"
-            )
-            write_string_to_file(
-                BLOB_CONTAINER, attachments_blob_path, json_serialize(attachments)
-            )
-
-            logger.info(
-                "Email attachments saved to blob storage blob: %s",
-                f"{attachments_blob_path}",
-            )
-
-    @task.branch
-    def check_and_parse_email(email_id: str, dag_run: DagRun | None = None):
-        """
-        Processes the MSGraph response containing the email.
-
-        If the email was received from the mailbox which is monitored
-        then no further processing should be done, as this may an email
-        sent by this DAG.
-
-        Otherwise, the body of the email is retrieved and processed to
-        plain text, before being saved to the storage account for the
-        next task.
-
-        Args:
-            email_id (str): The id of the email to retrieve from MS Graph
-        """
-        logger.info("Parsing email with id %s", email_id)
-
-        run_id = dag_run.run_id
-
-        msgraph_response = read_file_as_string(
-            container_name=BLOB_CONTAINER,
-            blob_name=f"{run_id}/{email_id}/{GRAPH_EMAIL_RESPONSE_FILENAME}",
-        )
-
-        logger.debug(msgraph_response)
-
-        msgraph_response = json_load(msgraph_response)
-
-        email_sender = msgraph_response["sender"]["emailAddress"]["address"]
-
-        mailbox = Variable.get("email_monitoring_mailbox")
-        if email_sender == mailbox:
-            logger.info(
-                "Email was sent from same mailbox, no futher processing required."
-            )
-            return "end"
-
-        email_body_content_type = msgraph_response["body"]["contentType"]
-
-        logger.debug("Email body content of type %s", email_body_content_type)
-
-        if email_body_content_type != "text" and email_body_content_type != "html":
-            logger.error(
-                "Unexpected email body type %s for email with id %s",
-                email_body_content_type,
-                email_id,
-            )
-            raise Exception("Unexpected email content type")
-
-        return "get_llm_response"
+        return upload_id
 
     @task
-    def get_llm_response(email_id: str, dag_run: DagRun | None = None):
-        """
-        Passes email contents to an LLM for enrichment, then saves the response to blob storage.
-
-        Args:
-            email_id (str): The id of the email to retrieve from MS Graph
-        """
-        logger.info("Getting LLM response for %s", email_id)
-
-        run_id = dag_run.run_id
-
-        base_path = f"{run_id}/{email_id}"
-
-        msgraph_response = json_load(
-            read_file_as_string(
-                container_name=BLOB_CONTAINER,
-                blob_name=f"{base_path}/{GRAPH_EMAIL_RESPONSE_FILENAME}",
-            )
-        )
-
-        logger.info("Retrieved graph response")
-
-        attachments_text = []
-        attachments_for_email = []
-        if msgraph_response["hasAttachments"]:
-            msgraph_attachments_response = json_load(
-                read_file_as_string(
-                    container_name=BLOB_CONTAINER,
-                    blob_name=f"{base_path}/{GRAPH_ATTACHMENTS_RESPONSE_FILENAME}",
-                )
-            )
-
-            attachments_text = get_attachments_text(msgraph_attachments_response)
-
-            attachments_for_email = [
-                {
-                    "@odata.type": attachment["@odata.type"],
-                    "contentType": attachment["contentType"],
-                    "contentBytes": attachment["contentBytes"],
-                    "contentId": attachment["contentId"],
-                    "name": attachment["name"],
-                    "isInline": attachment["isInline"],
-                }
-                for attachment in msgraph_attachments_response["value"]
-            ]
-
-        logger.info("Retrieved email attachments")
-
-        email_subject = msgraph_response["subject"]
-        augmented_email_subject = f"[LLM Enriched] {email_subject}"
-
-        email_body = msgraph_response["body"]["content"]
-        email_body_content_type = msgraph_response["body"]["contentType"]
-        parsed_email_body = (
-            html2text(email_body) if email_body_content_type == "html" else email_body
-        )
-
-        llm_response = get_llm_chat_response(
-            email_subject=email_subject,
-            email_contents=parsed_email_body,
-            attachments_text=attachments_text,
-        )
-        augmented_email_body = f"{md.markdown(llm_response)}<br/><hr><br/>{email_body}"
-
-        email_object = {
-            "subject": augmented_email_subject,
-            "body": augmented_email_body,
-            "attachments": attachments_for_email,
-        }
-
-        email_object_path = f"{run_id}/{email_id}/{EMAIL_RESPONSE_FILENAME}"
-
-        write_string_to_file(
-            container_name=BLOB_CONTAINER,
-            blob_name=f"{run_id}/{email_id}/{LLM_RESPONSE_FILENAME}",
-            string_data=llm_response,
-        )
-
-        write_string_to_file(
-            container_name=BLOB_CONTAINER,
-            blob_name=email_object_path,
-            string_data=json_serialize(email_object),
-        )
-
-        return email_object_path
+    def start_cytora_main_job(upload_id: str):
+        cytora_main = CytoraHook(SCHEMA_MAIN)
+        main_job_id, file_id = start_cytora_job(cytora_instance=cytora_main, upload_id=upload_id, file_name=GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME, media_type=MEDIA_TYPE)
+        return main_job_id
 
     @task
-    def send_email_to_inbox(email_object_path: str):
-        """
-        Sends an email back to the inbox with the LLM enriched version of the email.
-
-        Args:
-            email_object_path (str): The path to the blob containing details
-                                     of the email to be sent
-        """
-        logging.info("Sending LLM enriched email")
-        email_details = json_load(
-            read_file_as_string(BLOB_CONTAINER, email_object_path)
-        )
-
-        mailbox = Variable.get("email_monitoring_mailbox")
-        recipients = Variable.get("email_monitoring_recipients", deserialize_json=True)
-
-        logger.debug("Will send mail from mailbox %s", mailbox)
-        logger.debug("Will send email to recipients %s", recipients)
-
-        send_email(
-            subject=email_details["subject"],
-            html_content=email_details["body"],
-            to_addresses=recipients,
-            sending_mailbox=mailbox,
-            attachments=email_details["attachments"],
-        )
-
-        return
+    def save_cytora_job_output(job_id: str, ):
+        cytora_main = CytoraHook(SCHEMA_MAIN)
+        output = cytora_main.wait_for_schema_job(job_id)
+        key = save_cytora_output_to_blob_storage(output=output, key_prefix=OUTPUTS_PREFIX)
+        return key
 
     email_ids = get_email_ids()
 
-    email_content_task_instance = get_email_content.expand(email_id=email_ids)
-
-    email_attachments_task_instance = get_email_attachments.expand(email_id=email_ids)
-
-    parse_email_task_instance = check_and_parse_email.expand(email_id=email_ids)
-
-    email_object_paths = get_llm_response.expand(email_id=email_ids)
+    email_eml_file_task_instance = get_email_eml_file.expand(email_id=email_ids)
+    cytora_upload_ids = upload_file_for_cytora_main_job.expand(email_id=email_ids)
+    cytora_main_job_ids = start_cytora_main_job.expand(upload_id=cytora_upload_ids)
+    cytora_output_keys = save_cytora_job_output.expand(job_id=cytora_main_job_ids)
 
     (
-        email_content_task_instance
-        >> email_attachments_task_instance
-        >> parse_email_task_instance
-        >> email_object_paths
+        email_eml_file_task_instance
+        >> cytora_upload_ids
+        >> cytora_main_job_ids
+        >> cytora_output_keys
     )
-
-    send_email_to_inbox.expand(email_object_path=email_object_paths)
-
-    end = EmptyOperator(task_id="end", trigger_rule="none_failed_min_one_success")
-    parse_email_task_instance >> end
 
 
 process_email_change_notifications()
