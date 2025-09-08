@@ -3,7 +3,7 @@ import logging
 import time
 
 import requests
-from airflow.exceptions import AirflowFailException, AirflowException
+from airflow.exceptions import AirflowException, AirflowFailException
 from airflow.hooks.base import BaseHook
 
 CYTORA_CONNECTION_ID = "cytora"
@@ -75,7 +75,7 @@ class CytoraHook:
         return data["url"], data["id"]
 
     def upload_file(self, upload_url, file_stream=None, content_type="text/plain"):
-        logger.info(f"Uploading file to Cytora: [streamed]")
+        logger.info("Uploading file to Cytora: [streamed]")
         headers = {
             "Content-Type": content_type
         }
