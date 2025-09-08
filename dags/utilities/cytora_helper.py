@@ -23,6 +23,7 @@ class CytoraHook:
         self.auth_audience = self.conn.extra_dejson["auth_audience"]
         self.region = self.conn.extra_dejson["region"]
         self.workspace = self.conn.extra_dejson["workspace"]
+        self.cytora_url_prefix = f"https://{self.region}.gateway.cytora-prod.com"
 
         self.token = None
         self.token_expiry = 0
@@ -58,7 +59,7 @@ class CytoraHook:
 
     def get_presigned_url(self):
         logger.info("Requesting pre-signed upload URL...")
-        url = f"https://{self.region}.gateway.cytora-prod.com/files/workspaces/{self.workspace}/uploads/presigned-url"
+        url = f"{self.cytora_url_prefix}/files/workspaces/{self.workspace}/uploads/presigned-url"
         headers = self._get_headers()
 
         response = requests.get(url, headers=headers)
@@ -86,7 +87,7 @@ class CytoraHook:
 
     def create_file(self, upload_id, file_name, media_type):
         logger.info(f"Registering uploaded file: {file_name}")
-        url = f"https://{self.region}.gateway.cytora-prod.com/files/workspaces/{self.workspace}/files"
+        url = f"{self.cytora_url_prefix}/files/workspaces/{self.workspace}/files"
         payload = {"upload_id": upload_id, "name": file_name, "media_type": media_type}
         headers = self._get_headers()
         response = requests.post(url, headers=headers, json=payload)
@@ -105,7 +106,7 @@ class CytoraHook:
 
     def create_schema_job(self, file_id, job_name):
         logger.info(f"Creating schema job for file_id: {file_id}")
-        url = f"https://{self.region}.gateway.cytora-prod.com/digitize/workspaces/{self.workspace}/schemas/jobs"
+        url = f"{self.cytora_url_prefix}/digitize/workspaces/{self.workspace}/schemas/jobs"
         payload = {
             "schema_config_id": self.schema_config_id,
             "file_ids": [file_id],
@@ -121,7 +122,7 @@ class CytoraHook:
         return response.json()["id"]
 
     def get_schema_job_status(self, job_id):
-        url = f"https://{self.region}.gateway.cytora-prod.com/digitize/workspaces/{self.workspace}/schemas/jobs/{job_id}"
+        url = f"{self.cytora_url_prefix}/digitize/workspaces/{self.workspace}/schemas/jobs/{job_id}"
         headers = self._get_headers()
         response = requests.get(url, headers=headers)
         response.raise_for_status()
@@ -129,7 +130,7 @@ class CytoraHook:
         return data["status"], data["output_status"]
 
     def get_schema_job_output(self, job_id):
-        url = f"https://{self.region}.gateway.cytora-prod.com/digitize/workspaces/{self.workspace}/schemas/jobs/{job_id}/output"
+        url = f"{self.cytora_url_prefix}/digitize/workspaces/{self.workspace}/schemas/jobs/{job_id}/output"
         headers = self._get_headers()
         response = requests.get(url, headers=headers)
         if response.status_code == 400:

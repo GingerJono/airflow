@@ -129,9 +129,9 @@ def process_email_change_notifications():
         logger.info("Email eml file saved to blob storage: %s", email_blob_path)
 
     @task
-    def upload_file_for_cytora_main_job(email_id: str, dag_run: DagRun | None = None):
+    def start_cytora_main_job(email_id: str, dag_run: DagRun | None = None):
         """
-        Uploads an email EML file from blob storage to Cytora for processing.
+        Uploads an email EML file from blob storage to Cytora for processing, and starts the cytora main job.
 
         Args:
             email_id (str): The ID of the email whose EML file should be uploaded.
@@ -148,19 +148,6 @@ def process_email_change_notifications():
             raise AirflowException(
                 f"Failed to upload file to Cytora with HTTP status: {status}"
             )
-
-        return upload_id
-
-    @task
-    def start_cytora_main_job(upload_id: str):
-        """
-        Starts a Cytora schema job using a previously uploaded file.
-
-        Args:
-            upload_id (str): The ID of the uploaded file in Cytora.
-        """
-
-        cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
 
         try:
             main_job_id = start_cytora_job(
@@ -206,13 +193,11 @@ def process_email_change_notifications():
     email_ids = get_email_ids()
 
     email_eml_file_task_instance = get_email_eml_file.expand(email_id=email_ids)
-    cytora_upload_ids = upload_file_for_cytora_main_job.expand(email_id=email_ids)
-    cytora_main_job_ids = start_cytora_main_job.expand(upload_id=cytora_upload_ids)
+    cytora_main_job_ids = start_cytora_main_job.expand(email_id=email_ids)
     cytora_output_keys = save_cytora_job_output.expand(job_id=cytora_main_job_ids)
 
     (
         email_eml_file_task_instance
-        >> cytora_upload_ids
         >> cytora_main_job_ids
         >> cytora_output_keys
     )
