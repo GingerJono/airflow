@@ -17,6 +17,8 @@ from utilities.msgraph_helper import (
     get_eml_file_from_email_id,
 )
 
+from utilities.cytora_helper import CYTORA_SCHEMA_MAIN
+
 NUM_RETRIES = 2
 RETRY_DELAY_MINS = 3
 
@@ -26,7 +28,6 @@ OUTPUT_BLOB_CONTAINER = "cytora-output"
 
 GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME = "graph_message_eml_response_raw"
 MEDIA_TYPE = "message/rfc822"
-SCHEMA_MAIN = "ds:cfg:wr2pxXtxctBgFaZP"
 
 MAIN_OUTPUTS_PREFIX = "outputs_main"
 
@@ -80,7 +81,8 @@ def process_email_change_notifications():
     ### Process Email Changes
 
     This DAG is used to process notifications from MS Graph about
-    the receipt of emails.
+    the receipt of emails. The email content and attachment is uploaded to Cytora
+    for processing, and the resulting output is saved in Azure Blob Storage.
     """
 
     @task
@@ -135,7 +137,7 @@ def process_email_change_notifications():
             email_id (str): The ID of the email whose EML file should be uploaded.
         """
         run_id = dag_run.run_id
-        cytora_main = CytoraHook(SCHEMA_MAIN)
+        cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
         status, upload_id = upload_stream_to_cytora(
             email_id=email_id,
             media_type=MEDIA_TYPE,
@@ -158,7 +160,7 @@ def process_email_change_notifications():
             upload_id (str): The ID of the uploaded file in Cytora.
         """
 
-        cytora_main = CytoraHook(SCHEMA_MAIN)
+        cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
 
         try:
             main_job_id = start_cytora_job(
@@ -182,7 +184,7 @@ def process_email_change_notifications():
         Args:
             job_id (str): The Cytora job ID to poll and fetch output for.
         """
-        cytora_main = CytoraHook(SCHEMA_MAIN)
+        cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
         output = cytora_main.wait_for_schema_job(job_id)
 
         if not output:

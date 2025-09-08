@@ -8,6 +8,7 @@ from airflow.hooks.base import BaseHook
 
 CYTORA_CONNECTION_ID = "cytora"
 CYTORA_AUTH_URL = "https://token.cytora.com/oauth/token"
+CYTORA_SCHEMA_MAIN = "ds:cfg:wr2pxXtxctBgFaZP"
 
 logger = logging.getLogger(__name__)
 
