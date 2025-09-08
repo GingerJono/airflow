@@ -165,7 +165,7 @@ def process_email_change_notifications():
             raise AirflowFailException(f"No output returned for Cytora job {job_id}. Status may be errored or under human review.")
 
         try:
-            key = save_cytora_output_to_blob_storage(output=output, key_prefix=OUTPUTS_PREFIX)
+            key = save_cytora_output_to_blob_storage(output=output, key_prefix=MAIN_OUTPUTS_PREFIX)
         except Exception as e:
             raise AirflowException(f"Failed to save output for job {job_id} to blob storage: {e}")
 
