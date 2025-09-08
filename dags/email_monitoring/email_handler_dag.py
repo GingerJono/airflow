@@ -4,7 +4,7 @@ import os
 from datetime import timedelta, datetime
 
 from airflow.decorators import dag, task
-from airflow.exceptions import AirflowFailException
+from airflow.exceptions import AirflowFailException, AirflowException
 from airflow.models import Variable
 from airflow.models.dagrun import DagRun
 from airflow.models.param import Param
@@ -37,7 +37,7 @@ GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME = "graph_message_eml_response_raw"
 GRAPH_ATTACHMENTS_RESPONSE_FILENAME = "graph_attachments_response_raw"
 LLM_RESPONSE_FILENAME = "llm_response"
 EMAIL_RESPONSE_FILENAME = "email_response"
-MEDIA_TYPE = "application/vnd.ms-outlook"
+MEDIA_TYPE = "message/rfc822"
 SCHEMA_MAIN = "ds:cfg:wr2pxXtxctBgFaZP"
 
 OUTPUTS_PREFIX = "outputs"
@@ -58,7 +58,7 @@ def start_cytora_job(cytora_instance: CytoraHook, upload_id: str, file_name: str
     file_id = cytora_instance.create_file(upload_id, file_name, media_type)
     job_name = f"API {datetime.now().strftime('%Y%m%d')}: {file_name}"
     job_id = cytora_instance.create_schema_job(file_id, job_name)
-    return job_id, file_id
+    return job_id
 
 def save_cytora_output_to_blob_storage(output: dict, key_prefix:str):
     ts = datetime.now().strftime('%Y%m%d%H%M%S%f')[:-3]
@@ -113,44 +113,77 @@ def process_email_change_notifications():
         mailbox = Variable.get("email_monitoring_mailbox")
         result = get_eml_file_from_email_id(email_id=email_id, mailbox=mailbox)
 
-        # This replaces the eml file with a msg file from local file system
-        dag_dir = os.path.dirname(__file__)
-        file_path = os.path.join(dag_dir, "test_dev_mailbox.msg")
-
-        with open(file_path, "rb") as f:
-            msg_bytes = f.read()
-
         logger.info("Saving email eml file to blob storage...")
         run_id = dag_run.run_id
 
         email_blob_path = f"{run_id}/{email_id}/{GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME}"
 
-        write_bytes_to_file(BLOB_CONTAINER, email_blob_path, msg_bytes)
+        try:
+            write_bytes_to_file(BLOB_CONTAINER, email_blob_path, result)
+        except Exception as e:
+            raise AirflowException(f"Failed to save eml file for email {email_id} to blob storage: {e}")
 
         logger.info("Email eml file saved to blob storage: %s", email_blob_path)
 
     @task
     def upload_file_for_cytora_main_job(email_id: str, dag_run: DagRun | None = None):
+        """
+        Uploads an email EML file from blob storage to Cytora for processing.
+
+        Args:
+            email_id (str): The ID of the email whose EML file should be uploaded.
+        """
         run_id = dag_run.run_id
         cytora_main = CytoraHook(SCHEMA_MAIN)
         status, upload_id = upload_stream_to_cytora(email_id=email_id, media_type=MEDIA_TYPE, cytora_instance = cytora_main, dag_run_id=run_id)
         if status != 200:
-            logger.error("UploadFailed", f"Upload to Cytora returned HTTP {status}")
-            raise RuntimeError(f"Upload failed: {status}")
+            raise AirflowException(f"Failed to upload file to Cytora with HTTP status: {status}")
 
         return upload_id
 
     @task
     def start_cytora_main_job(upload_id: str):
+
+        """
+        Starts a Cytora schema job using a previously uploaded file.
+
+        Args:
+            upload_id (str): The ID of the uploaded file in Cytora.
+        """
+
         cytora_main = CytoraHook(SCHEMA_MAIN)
-        main_job_id, file_id = start_cytora_job(cytora_instance=cytora_main, upload_id=upload_id, file_name=GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME, media_type=MEDIA_TYPE)
+
+        try:
+            main_job_id = start_cytora_job(cytora_instance=cytora_main, upload_id=upload_id, file_name=GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME, media_type=MEDIA_TYPE)
+        except Exception as e:
+            raise AirflowException(f"Failed to start Cytora main job: {e}")
+
+        if not main_job_id:
+            raise AirflowFailException("No main job id provided.")
+
+        logger.info(f"Starting cytora main job with id {main_job_id}")
+
         return main_job_id
 
     @task
     def save_cytora_job_output(job_id: str, ):
+        """
+        Waits for a Cytora job to complete, retrieves its output, and saves the result to blob storage.
+
+        Args:
+            job_id (str): The Cytora job ID to poll and fetch output for.
+        """
         cytora_main = CytoraHook(SCHEMA_MAIN)
         output = cytora_main.wait_for_schema_job(job_id)
-        key = save_cytora_output_to_blob_storage(output=output, key_prefix=OUTPUTS_PREFIX)
+
+        if not output:
+            raise AirflowFailException(f"No output returned for Cytora job {job_id}. Status may be errored or under human review.")
+
+        try:
+            key = save_cytora_output_to_blob_storage(output=output, key_prefix=OUTPUTS_PREFIX)
+        except Exception as e:
+            raise AirflowException(f"Failed to save output for job {job_id} to blob storage: {e}")
+
         return key
 
     email_ids = get_email_ids()

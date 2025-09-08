@@ -3,6 +3,7 @@ import logging
 import time
 
 import requests
+from airflow.exceptions import AirflowFailException, AirflowException
 from airflow.hooks.base import BaseHook
 
 CYTORA_CONNECTION_ID = "cytora"
@@ -66,7 +67,9 @@ class CytoraHook:
         logger.debug("Full response: %s", json.dumps(data, indent=2))
 
         if "url" not in data or "id" not in data:
-            raise KeyError(f"Expected keys not found in response: {data}")
+            raise AirflowFailException(
+                f"Presigned URL response missing required keys: {json.dumps(data)}"
+            )
 
         logger.info("Pre-signed URL obtained.")
         return data["url"], data["id"]
@@ -98,7 +101,7 @@ class CytoraHook:
         logger.debug("Full response from file registration: %s", json.dumps(data, indent=2))
 
         if "id" not in data:
-            raise KeyError(f"'id' not found in response: {data}")
+            raise AirflowFailException(f"'id' not found in response: {data}")
 
         logger.info("File registered with Cytora.")
         return data["id"]
@@ -114,7 +117,7 @@ class CytoraHook:
         headers = self._get_headers()
         response = requests.post(url, headers=headers, json=payload)
         if response.status_code not in [200, 201]:
-            raise Exception(f"Schema job creation failed: {response.status_code} - {response.text}")
+            raise AirflowException(f"Schema job creation failed: {response.status_code} - {response.text}")
         logger.info("Schema job created.")
         return response.json()["id"]
 
@@ -131,7 +134,7 @@ class CytoraHook:
         headers = self._get_headers()
         response = requests.get(url, headers=headers)
         if response.status_code == 400:
-            raise Exception("Job is not finished yet. Wait for completion first.")
+            raise AirflowException("Job is not finished yet. Wait for completion first.")
         response.raise_for_status()
         return response.json()
 
@@ -166,8 +169,6 @@ class CytoraHook:
                 attempt += 1
 
             except Exception as e:
-                logger.error(f"Polling error for job {job_id}: {e}", exc_info=True)
-                return None  # Gracefully exit on API/logic error
+                raise AirflowException(f"Polling error for job {job_id}: {e}", exc_info=True)
 
-        logger.error(f"Job {job_id} did not complete within {max_attempts * poll_interval} seconds.")
-        return None
+        raise AirflowFailException(f"Job {job_id} did not complete within {max_attempts * poll_interval} seconds.")
