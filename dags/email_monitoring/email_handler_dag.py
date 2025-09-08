@@ -1,29 +1,21 @@
 import json
 import logging
-import os
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 
 from airflow.decorators import dag, task
-from airflow.exceptions import AirflowFailException, AirflowException
+from airflow.exceptions import AirflowException, AirflowFailException
 from airflow.models import Variable
 from airflow.models.dagrun import DagRun
 from airflow.models.param import Param
 from utilities.blob_storage_helper import (
-    read_file_as_string,
     read_file_as_bytes,
-    write_string_to_file,
     write_bytes_to_file,
+    write_string_to_file,
 )
-from utilities.email_attachments_helper import get_attachments_text
+from utilities.cytora_helper import CytoraHook
 from utilities.msgraph_helper import (
     get_eml_file_from_email_id,
-    get_attachments_from_email_id,
-    get_email_from_id,
-    send_email,
 )
-from utilities.open_ai_helper import get_llm_chat_response
-
-from utilities.cytora_helper import CytoraHook
 
 NUM_RETRIES = 2
 RETRY_DELAY_MINS = 3
