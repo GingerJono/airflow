@@ -76,9 +76,7 @@ class CytoraHook:
 
     def upload_file(self, upload_url, file_stream=None, content_type="text/plain"):
         logger.info("Uploading file to Cytora: [streamed]")
-        headers = {
-            "Content-Type": content_type
-        }
+        headers = {"Content-Type": content_type}
 
         response = requests.put(upload_url, headers=headers, data=file_stream)
         response.raise_for_status()
@@ -88,17 +86,15 @@ class CytoraHook:
     def create_file(self, upload_id, file_name, media_type):
         logger.info(f"Registering uploaded file: {file_name}")
         url = f"https://{self.region}.gateway.cytora-prod.com/files/workspaces/{self.workspace}/files"
-        payload = {
-            "upload_id": upload_id,
-            "name": file_name,
-            "media_type": media_type
-        }
+        payload = {"upload_id": upload_id, "name": file_name, "media_type": media_type}
         headers = self._get_headers()
         response = requests.post(url, headers=headers, json=payload)
         response.raise_for_status()
 
         data = response.json()
-        logger.debug("Full response from file registration: %s", json.dumps(data, indent=2))
+        logger.debug(
+            "Full response from file registration: %s", json.dumps(data, indent=2)
+        )
 
         if "id" not in data:
             raise AirflowFailException(f"'id' not found in response: {data}")
@@ -112,12 +108,14 @@ class CytoraHook:
         payload = {
             "schema_config_id": self.schema_config_id,
             "file_ids": [file_id],
-            "name": job_name
+            "name": job_name,
         }
         headers = self._get_headers()
         response = requests.post(url, headers=headers, json=payload)
         if response.status_code not in [200, 201]:
-            raise AirflowException(f"Schema job creation failed: {response.status_code} - {response.text}")
+            raise AirflowException(
+                f"Schema job creation failed: {response.status_code} - {response.text}"
+            )
         logger.info("Schema job created.")
         return response.json()["id"]
 
@@ -127,24 +125,30 @@ class CytoraHook:
         response = requests.get(url, headers=headers)
         response.raise_for_status()
         data = response.json()
-        return data['status'], data['output_status']
+        return data["status"], data["output_status"]
 
     def get_schema_job_output(self, job_id):
         url = f"https://{self.region}.gateway.cytora-prod.com/digitize/workspaces/{self.workspace}/schemas/jobs/{job_id}/output"
         headers = self._get_headers()
         response = requests.get(url, headers=headers)
         if response.status_code == 400:
-            raise AirflowException("Job is not finished yet. Wait for completion first.")
+            raise AirflowException(
+                "Job is not finished yet. Wait for completion first."
+            )
         response.raise_for_status()
         return response.json()
 
-    def wait_for_schema_job(self, job_id, poll_interval=10, max_attempts=250, output_file_path=None):
+    def wait_for_schema_job(
+        self, job_id, poll_interval=10, max_attempts=250, output_file_path=None
+    ):
         logger.info(f"Waiting for schema job {job_id} to complete...")
         attempt = 0
         while attempt < max_attempts:
             try:
                 status, output_status = self.get_schema_job_status(job_id)
-                logger.info(f"Attempt {attempt + 1}: Status = {status}, Output Status = {output_status}")
+                logger.info(
+                    f"Attempt {attempt + 1}: Status = {status}, Output Status = {output_status}"
+                )
 
                 if status == "finished" and output_status == "confirmed":
                     logger.info("Job completed. Fetching output...")
@@ -156,7 +160,9 @@ class CytoraHook:
                     return output
 
                 elif status == "errored":
-                    logger.warning(f"Job {job_id} finished with error status. Output status: {output_status}")
+                    logger.warning(
+                        f"Job {job_id} finished with error status. Output status: {output_status}"
+                    )
                     # Optionally fetch and log any available partial output
                     try:
                         output = self.get_schema_job_output(job_id)
@@ -169,6 +175,10 @@ class CytoraHook:
                 attempt += 1
 
             except Exception as e:
-                raise AirflowException(f"Polling error for job {job_id}: {e}", exc_info=True)
+                raise AirflowException(
+                    f"Polling error for job {job_id}: {e}", exc_info=True
+                )
 
-        raise AirflowFailException(f"Job {job_id} did not complete within {max_attempts * poll_interval} seconds.")
+        raise AirflowFailException(
+            f"Job {job_id} did not complete within {max_attempts * poll_interval} seconds."
+        )
