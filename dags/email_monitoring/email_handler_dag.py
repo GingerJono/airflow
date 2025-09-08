@@ -12,12 +12,10 @@ from utilities.blob_storage_helper import (
     write_bytes_to_file,
     write_string_to_file,
 )
-from utilities.cytora_helper import CytoraHook
+from utilities.cytora_helper import CYTORA_SCHEMA_MAIN, CytoraHook
 from utilities.msgraph_helper import (
     get_eml_file_from_email_id,
 )
-
-from utilities.cytora_helper import CYTORA_SCHEMA_MAIN
 
 NUM_RETRIES = 2
 RETRY_DELAY_MINS = 3
@@ -196,11 +194,7 @@ def process_email_change_notifications():
     cytora_main_job_ids = start_cytora_main_job.expand(email_id=email_ids)
     cytora_output_keys = save_cytora_job_output.expand(job_id=cytora_main_job_ids)
 
-    (
-        email_eml_file_task_instance
-        >> cytora_main_job_ids
-        >> cytora_output_keys
-    )
+    (email_eml_file_task_instance >> cytora_main_job_ids >> cytora_output_keys)
 
 
 process_email_change_notifications()
