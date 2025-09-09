@@ -97,6 +97,11 @@ def create_subscription(
     )
 
 
+def get_eml_file_from_email_id(email_id: str, mailbox: str):
+    logger.info("Getting eml file of email from MS Graph based on ID: %s", email_id)
+    return _run_msgraph_query(url=f"/users/{mailbox}/messages/{email_id}/$value")
+
+
 def get_email_from_id(email_id: str, mailbox: str):
     logger.info("Getting email from MS Graph based on ID: %s", email_id)
     return _run_msgraph_query(url=f"/users/{mailbox}/messages/{email_id}")

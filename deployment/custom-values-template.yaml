@@ -232,7 +232,7 @@ airflow:
       password: "${CYTORA_CLIENT_SECRET}"
       extra: |
         {
-          "region": "${CYTORA_REGION}"
+          "url_prefix": "${CYTORA_URL_PREFIX}"
           "workspace": "${CYTORA_WORKSPACE}"
           "auth_audience": "${CYTORA_AUTH_AUDIENCE}"
         }
@@ -298,11 +298,6 @@ airflow:
       name: "cytora-connection-credentials"
       key: "client_secret"
 
-    CYTORA_REGION:
-      kind: "configmap"
-      name: "cytora-connection-configs"
-      key: "region"
-
     CYTORA_WORKSPACE:
       kind: "configmap"
       name: "cytora-connection-configs"
@@ -312,6 +307,12 @@ airflow:
       kind: "configmap"
       name: "cytora-connection-configs"
       key: "auth_audience"
+
+    CYTORA_URL_PREFIX:
+      kind: "configmap"
+      name: "cytora-connection-configs"
+      key: "url_prefix"
+
 
   ## a list airflow variables to create
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-variables.md
