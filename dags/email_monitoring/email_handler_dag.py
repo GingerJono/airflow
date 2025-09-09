@@ -30,6 +30,7 @@ MEDIA_TYPE = "message/rfc822"
 MAIN_OUTPUTS_PREFIX = "outputs_main"
 
 TIMESTAMP_FORMAT_MILLISECONDS = "%Y%m%d%H%M%S%f"
+DEFAULT_DATE_FORMAT = "%Y%m%d"
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ def start_cytora_job(
     cytora_instance: CytoraHook, upload_id: str, file_name: str, media_type: str
 ):
     file_id = cytora_instance.create_file(upload_id, file_name, media_type)
-    job_name = f"API {datetime.now().strftime('%Y%m%d')}: {file_name}"
+    job_name = f"API {datetime.now().strftime(DEFAULT_DATE_FORMAT)}: {file_name}"
     job_id = cytora_instance.create_schema_job(file_id, job_name)
     return job_id
 
