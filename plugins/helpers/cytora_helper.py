@@ -6,9 +6,32 @@ import requests
 from airflow.exceptions import AirflowException, AirflowFailException
 from airflow.hooks.base import BaseHook
 
+from utilities.utility_helper import to_str_or_none, parse_date_or_none
+
 CYTORA_CONNECTION_ID = "cytora"
 CYTORA_AUTH_URL = "https://token.cytora.com/oauth/token"
 CYTORA_SCHEMA_MAIN = "ds:cfg:wr2pxXtxctBgFaZP"
+
+CYTORA_OUTPUT_FIELD_MAP_MAIN = {
+    "OutputInsuredName": ("insured_name", to_str_or_none),
+    "OutputInsuredDomicile": ("insured_domicile", to_str_or_none),
+    "OutputInsuredState": ("insured_state", to_str_or_none),
+    "OutputReinsuredName": ("reinsured_name", to_str_or_none),
+    "OutputReinsuredDomicile": ("reinsured_domicile", to_str_or_none),
+    "OutputReinsuredState": ("reinsured_state", to_str_or_none),
+    "OutputBrokerCompany": ("broker_company", to_str_or_none),
+    "OutputBrokerContact": ("broker_contact", to_str_or_none),
+    "OutputLineOfBusiness": ("line_of_business", to_str_or_none),
+    "OutputPolicyType": ("policy_type", to_str_or_none),
+    "OutputUnderwriter": ("underwriter", to_str_or_none),
+    "OutputInceptionDate": ("inception_date", parse_date_or_none),
+    "OutputExpiryDate": ("expiry_date", parse_date_or_none),
+    "OutputRiskLocation": ("risk_location", to_str_or_none),
+    "OutputAdditionalParties": ("additional_parties", to_str_or_none),
+    "OutputSubmissionSummary": ("submission_summary", to_str_or_none),
+    "OutputNewRenewal": ("new_vs_renewal", to_str_or_none),
+    "OutputRenewedFrom": ("renewed_from", to_str_or_none),
+}
 
 CYTORA_API_POLL_INTERVAL = 30
 CYTORA_API_TIMEOUT = 1800

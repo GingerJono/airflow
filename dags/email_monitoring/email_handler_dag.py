@@ -20,6 +20,9 @@ from utilities.msgraph_helper import (
     get_eml_file_from_email_id,
 )
 
+from utilities.cytora_helper import CYTORA_OUTPUT_FIELD_MAP_MAIN
+from utilities.utility_helper import get_field_value
+
 NUM_RETRIES = 2
 RETRY_DELAY_MINS = 3
 
@@ -30,7 +33,8 @@ OUTPUT_BLOB_CONTAINER = "cytora-output"
 GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME = "graph_message_eml_response_raw"
 MEDIA_TYPE = "message/rfc822"
 
-MAIN_OUTPUTS_PREFIX = "outputs_main"
+MAIN_FULL_OUTPUTS_PREFIX = "outputs_main/full_output"
+MAIN_EXTRACTED_OUTPUTS_PREFIX = "outputs_main/extracted_output"
 
 TIMESTAMP_FORMAT_MILLISECONDS = "%Y%m%d%H%M%S%f"
 DEFAULT_DATE_FORMAT = "%Y%m%d"
@@ -68,6 +72,24 @@ def save_cytora_output_to_blob_storage(output: dict, key_prefix: str):
     output_json = json.dumps(output, indent=2)
     write_string_to_file(OUTPUT_BLOB_CONTAINER, key, output_json)
     return key
+
+
+def extract_outputs(output: dict):
+    def gv(k):
+        return get_field_value(output, k)
+
+    extracted_outputs = {}
+
+    try:
+        for output_key, (gv_key, transform_fn) in CYTORA_OUTPUT_FIELD_MAP_MAIN.items():
+            extracted_outputs[output_key] = transform_fn(gv(gv_key))
+        extracted_outputs["job_id"] = output["job_id"]
+    except Exception as e:
+        raise AirflowException(
+            f"Failed to extract outpus: {e}"
+        )
+
+    return extracted_outputs
 
 
 @dag(
@@ -184,15 +206,26 @@ def process_email_change_notifications():
             )
 
         try:
-            key = save_cytora_output_to_blob_storage(
-                output=output, key_prefix=MAIN_OUTPUTS_PREFIX
+            full_output_key = save_cytora_output_to_blob_storage(
+                output=output, key_prefix=MAIN_FULL_OUTPUTS_PREFIX
             )
         except Exception as e:
             raise AirflowException(
-                f"Failed to save output for job {job_id} to blob storage: {e}"
+                f"Failed to save full output for job {job_id} to blob storage: {e}"
             )
 
-        return key
+
+        extracted_output = extract_outputs(output)
+        try:
+            extracted_output_key = save_cytora_output_to_blob_storage(
+                output=extracted_output, key_prefix=MAIN_EXTRACTED_OUTPUTS_PREFIX
+            )
+        except Exception as e:
+            raise AirflowException(
+                f"Failed to save extracted output for job {job_id} to blob storage: {e}"
+            )
+
+        return full_output_key, extracted_output_key
 
     email_ids = get_email_ids()
 
