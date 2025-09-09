@@ -310,7 +310,9 @@ airflow:
 
     CYTORA_URL_PREFIX:
       kind: "configmap"
-      name: "url_prefix"
+      name: "cytora-connection-configs"
+      key: "url_prefix"
+
 
   ## a list airflow variables to create
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-variables.md
