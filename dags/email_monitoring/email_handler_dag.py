@@ -29,6 +29,8 @@ MEDIA_TYPE = "message/rfc822"
 
 MAIN_OUTPUTS_PREFIX = "outputs_main"
 
+TIMESTAMP_FORMAT_MILLISECONDS = "%Y%m%d%H%M%S%f"
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,7 +58,7 @@ def start_cytora_job(
 
 
 def save_cytora_output_to_blob_storage(output: dict, key_prefix: str):
-    ts = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]
+    ts = datetime.now().strftime(TIMESTAMP_FORMAT_MILLISECONDS)[:-3]
     output["TimeProcessed"] = ts
     key = f"{key_prefix}/{ts}_{output['job_id']}.json"
     output_json = json.dumps(output, indent=2)
@@ -97,7 +99,7 @@ def process_email_change_notifications():
         return email_ids
 
     @task
-    def get_email_eml_file(email_id: str, dag_run: DagRun | None = None):
+    def download_email_eml_file(email_id: str, dag_run: DagRun | None = None):
         """
         Retrieves the eml file of an email from MS Graph, and saves the raw response
         to Azure Blob Storage.
@@ -190,7 +192,7 @@ def process_email_change_notifications():
 
     email_ids = get_email_ids()
 
-    email_eml_file_task_instance = get_email_eml_file.expand(email_id=email_ids)
+    email_eml_file_task_instance = download_email_eml_file.expand(email_id=email_ids)
     cytora_main_job_ids = start_cytora_main_job.expand(email_id=email_ids)
     cytora_output_keys = save_cytora_job_output.expand(job_id=cytora_main_job_ids)
 

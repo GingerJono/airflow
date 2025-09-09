@@ -21,9 +21,8 @@ class CytoraHook:
         self.client_id = self.conn.login
         self.client_secret = self.conn.password
         self.auth_audience = self.conn.extra_dejson["auth_audience"]
-        self.region = self.conn.extra_dejson["region"]
         self.workspace = self.conn.extra_dejson["workspace"]
-        self.cytora_url_prefix = f"https://{self.region}.gateway.cytora-prod.com"
+        self.cytora_url_prefix = self.conn.extra_dejson["url_prefix"]
 
         self.token = None
         self.token_expiry = 0
