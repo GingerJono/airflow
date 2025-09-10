@@ -78,7 +78,7 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:-.}/local/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/local/config:/opt/airflow/config
-    - ${AIRFLOW_PROJ_DIR:-.}/local/plugins:/opt/airflow/plugins
+    - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     &airflow-common-depends-on

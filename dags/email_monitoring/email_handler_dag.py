@@ -7,12 +7,15 @@ from airflow.exceptions import AirflowException, AirflowFailException
 from airflow.models import Variable
 from airflow.models.dagrun import DagRun
 from airflow.models.param import Param
+from email_monitoring.cytora_api_status_sensor_operator import (
+    CytoraApiStatusSensorOperator,
+)
+from helpers.cytora_helper import CYTORA_SCHEMA_MAIN, CytoraHook
 from utilities.blob_storage_helper import (
     read_file_as_bytes,
     write_bytes_to_file,
     write_string_to_file,
 )
-from utilities.cytora_helper import CYTORA_SCHEMA_MAIN, CytoraHook
 from utilities.msgraph_helper import (
     get_eml_file_from_email_id,
 )
@@ -167,13 +170,13 @@ def process_email_change_notifications():
     @task
     def save_cytora_job_output(job_id: str):
         """
-        Waits for a Cytora job to complete, retrieves its output, and saves the result to blob storage.
+        Retrieve Cytora output and saves the result to blob storage.
 
         Args:
-            job_id (str): The Cytora job ID to poll and fetch output for.
+            job_id (str): The Cytora job ID to fetch output for.
         """
         cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
-        output = cytora_main.wait_for_schema_job(job_id)
+        output = cytora_main.get_result_for_schema_job(job_id)
 
         if not output:
             raise AirflowFailException(
@@ -197,7 +200,17 @@ def process_email_change_notifications():
     cytora_main_job_ids = start_cytora_main_job.expand(email_id=email_ids)
     cytora_output_keys = save_cytora_job_output.expand(job_id=cytora_main_job_ids)
 
-    (email_eml_file_task_instance >> cytora_main_job_ids >> cytora_output_keys)
+    wait_for_main_job = CytoraApiStatusSensorOperator.partial(
+        task_id="wait_for_main_cytora_api_status",
+        cytora_schema=CYTORA_SCHEMA_MAIN,
+    ).expand(job_id=cytora_main_job_ids)
+
+    (
+        email_eml_file_task_instance
+        >> cytora_main_job_ids
+        >> wait_for_main_job
+        >> cytora_output_keys
+    )
 
 
 process_email_change_notifications()

@@ -12,6 +12,7 @@ ARG AIRFLOW_EXTRAS="cncf.kubernetes,postgres,microsoft.azure"
 ARG AIRFLOW_CONSTRAINTS_LOCATION="https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_MAJOR_MINOR_VERSION}.txt"
 
 COPY --chown=airflow:root /dags /opt/airflow/dags
+COPY --chown=airflow:root /plugins /opt/airflow/plugins
 
 COPY deployment /deployment
 RUN pip install -U pip==25.0.1 && \

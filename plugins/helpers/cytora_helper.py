@@ -10,6 +10,9 @@ CYTORA_CONNECTION_ID = "cytora"
 CYTORA_AUTH_URL = "https://token.cytora.com/oauth/token"
 CYTORA_SCHEMA_MAIN = "ds:cfg:wr2pxXtxctBgFaZP"
 
+CYTORA_API_POLL_INTERVAL = 30
+CYTORA_API_TIMEOUT = 1800
+
 logger = logging.getLogger(__name__)
 
 
@@ -139,47 +142,22 @@ class CytoraHook:
         response.raise_for_status()
         return response.json()
 
-    def wait_for_schema_job(
-        self, job_id, poll_interval=10, max_attempts=250, output_file_path=None
-    ):
-        logger.info(f"Waiting for schema job {job_id} to complete...")
-        attempt = 0
-        while attempt < max_attempts:
+    def get_result_for_schema_job(self, job_id):
+        status, output_status = self.get_schema_job_status(job_id)
+
+        if status == "finished" and output_status == "confirmed":
+            logger.info("Job completed. Fetching output...")
+            output = self.get_schema_job_output(job_id)
+            return output
+
+        elif status == "errored":
+            logger.warning(
+                f"Job {job_id} finished with error status. Output status: {output_status}"
+            )
+            # Optionally fetch and log any available partial output
             try:
-                status, output_status = self.get_schema_job_status(job_id)
-                logger.info(
-                    f"Attempt {attempt + 1}: Status = {status}, Output Status = {output_status}"
-                )
-
-                if status == "finished" and output_status == "confirmed":
-                    logger.info("Job completed. Fetching output...")
-                    output = self.get_schema_job_output(job_id)
-                    if output_file_path:
-                        with open(output_file_path, "w") as f:
-                            json.dump(output, f, indent=2)
-                        logger.info(f"Output saved to {output_file_path}")
-                    return output
-
-                elif status == "errored":
-                    logger.warning(
-                        f"Job {job_id} finished with error status. Output status: {output_status}"
-                    )
-                    # Optionally fetch and log any available partial output
-                    try:
-                        output = self.get_schema_job_output(job_id)
-                        logger.debug(f"Partial output: {json.dumps(output, indent=2)}")
-                    except Exception as fetch_err:
-                        logger.debug(f"No output could be retrieved: {fetch_err}")
-                    return None  # End polling gracefully
-
-                time.sleep(poll_interval)
-                attempt += 1
-
-            except Exception as e:
-                raise AirflowException(
-                    f"Polling error for job {job_id}: {e}", exc_info=True
-                )
-
-        raise AirflowFailException(
-            f"Job {job_id} did not complete within {max_attempts * poll_interval} seconds."
-        )
+                output = self.get_schema_job_output(job_id)
+                logger.debug(f"Partial output: {json.dumps(output, indent=2)}")
+            except Exception as fetch_err:
+                logger.debug(f"No output could be retrieved: {fetch_err}")
+            return None

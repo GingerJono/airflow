@@ -576,6 +576,53 @@ dags:
       ssh.dev.azure.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7Hr1oTWqNqOlzGJOfGJ4NakVyIzf1rXYd4d7wo6jBlkLvCA4odBlL0mDUyZ0/QUfTTqeu+tm22gOsv+VrVTMk6vwRU75gY/y9ut5Mb3bR5BV58dKXyq9A9UeB5Cakehn5Zgm6x1mKoVyf+FFn26iYqXJRgzIZZcZ5V6hrE0Qg39kZm4az48o0AUbf6Sp4SLdvnuMa2sVNwHBboS7EJkm57XQPVU3/QpyNLHbWDdzwtrlS+ez30S3AdYhLKEOxAG8weOnyrtLJAUen9mTkol8oII1edf7mWWbWVf0nBmly21+nZcmCTISQBtdcyPaEno7fFQMDD26/s0lfKob4Kw8H
 
 ###################################
+## CONFIG | Airflow Plugins
+###################################
+
+plugins:
+  ## the airflow plugins folder
+  path: /opt/airflow/plugins
+
+  ## configs for the plugins PVC
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/load-dag-definitions.md
+  persistence:
+    enabled: false
+
+  ## configs for the git-sync sidecar
+  ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/load-dag-definitions.md
+  gitSync:
+    enabled: false
+    
+    repoHost: "azure.com"
+    
+    repo: git@ssh.dev.azure.com:v3/DaleBI/DaleSoftwireIntegrationLayer/airflow
+    branch: 89-email-integration-migration
+    revision: HEAD
+    
+    ## the sub-path within your repo where dags are located
+    ## NOTE: airflow will only see dags under this path, but the whole repo will still be synced
+    repoSubPath: "/plugins"
+    
+    ## number of seconds to wait between syncs
+    ## NOTE: also sets `AIRFLOW__SCHEDULER__DAG_DIR_LIST_INTERVAL` unless overwritten in `airflow.config`
+    syncWait: 60
+    
+    ## the max number of seconds allowed for a complete sync
+    ## NOTE: if your repo takes a very long time to sync, you may need to increase this value
+    syncTimeout: 120
+    
+    ## the number of consecutive failures allowed before aborting
+    ## NOTE: if your repo regularly has intermittent failures, you may wish to set a non-0 value
+    maxFailures: 0
+    
+    sshSecret: "airflow-ssh-git-secret"
+    sshSecretKey: "id_rsa"
+    
+    ## NOTE: "known_hosts" verification can be disabled by setting to "" 
+    sshKnownHosts: |-
+      ssh.dev.azure.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7Hr1oTWqNqOlzGJOfGJ4NakVyIzf1rXYd4d7wo6jBlkLvCA4odBlL0mDUyZ0/QUfTTqeu+tm22gOsv+VrVTMk6vwRU75gY/y9ut5Mb3bR5BV58dKXyq9A9UeB5Cakehn5Zgm6x1mKoVyf+FFn26iYqXJRgzIZZcZ5V6hrE0Qg39kZm4az48o0AUbf6Sp4SLdvnuMa2sVNwHBboS7EJkm57XQPVU3/QpyNLHbWDdzwtrlS+ez30S3AdYhLKEOxAG8weOnyrtLJAUen9mTkol8oII1edf7mWWbWVf0nBmly21+nZcmCTISQBtdcyPaEno7fFQMDD26/s0lfKob4Kw8H
+
+###################################
 ## CONFIG | Kubernetes Ingress
 ###################################
 ingress:
