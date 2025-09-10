@@ -4,6 +4,8 @@ parameters:
   kubernetesNamespace:
   connectionName:
   environment:
+  acrImageRepository:
+  acrImageTag:
 
 steps:
   - download: "current"
@@ -39,3 +41,6 @@ steps:
       chartName: "${{ parameters.helmRepoName }}/airflow"
       install: true
       valueFiles: "$(Pipeline.Workspace)/HelmConfig/custom-values-template.yaml"
+    overrideValues: |
+      airflow.image.repository=${{ parameters.acrImageRepository }}
+      airflow.image.tag=${{ parameters.acrImageTag }}

@@ -77,6 +77,8 @@ stages:
                     helmRepoName: "$(helmRepoName)"
                     kubernetesNamespace: "$(kubernetesNamespace)"
                     connectionName: "Dev Integration Layer K8s Cluster"
+                    acrImageRepository: "$(acrImageRepository)"
+                    acrImageTag: "$(acrImageTag)"
   
   - stage: DeployProduction
     displayName: Deploy to Production
