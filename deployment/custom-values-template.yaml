@@ -10,7 +10,7 @@ airflow:
     
     ## WARNING: even if set to "Always" DO NOT reuse tag names, 
     ##          containers only pull the latest image when restarting
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
   ## the airflow executor type to use
   executor: KubernetesExecutor
