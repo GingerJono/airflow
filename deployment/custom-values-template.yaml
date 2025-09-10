@@ -549,7 +549,7 @@ dags:
     repoHost: "azure.com"
     
     repo: git@ssh.dev.azure.com:v3/DaleBI/DaleSoftwireIntegrationLayer/airflow
-    branch: 89-email-integration-migration
+    branch: main
     revision: HEAD
     
     ## the sub-path within your repo where dags are located
@@ -596,7 +596,7 @@ plugins:
     repoHost: "azure.com"
     
     repo: git@ssh.dev.azure.com:v3/DaleBI/DaleSoftwireIntegrationLayer/airflow
-    branch: 89-email-integration-migration
+    branch: main
     revision: HEAD
     
     ## the sub-path within your repo where dags are located
