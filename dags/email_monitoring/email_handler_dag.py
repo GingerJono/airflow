@@ -1,18 +1,22 @@
 import json
 import logging
+import re
+from collections import defaultdict
 from datetime import datetime, timedelta
 
-from airflow.decorators import dag, task
+from airflow.decorators import dag, task, task_group
 from airflow.exceptions import AirflowException, AirflowFailException
 from airflow.models import Variable
 from airflow.models.dagrun import DagRun
 from airflow.models.param import Param
+from airflow.operators.empty import EmptyOperator
 from email_monitoring.cytora_api_status_sensor_operator import (
     CytoraApiStatusSensorOperator,
 )
 from helpers.cytora_helper import CYTORA_SCHEMA_MAIN, CytoraHook
 from helpers.cytora_mappings import CYTORA_OUTPUT_FIELD_MAP_MAIN
 from helpers.utils import get_field_value
+
 from utilities.blob_storage_helper import (
     read_file_as_bytes,
     write_bytes_to_file,
@@ -34,6 +38,10 @@ MEDIA_TYPE = "message/rfc822"
 
 MAIN_FULL_OUTPUTS_PREFIX = "outputs_main/full_output"
 MAIN_EXTRACTED_OUTPUTS_PREFIX = "outputs_main/extracted_output"
+SOV_FULL_OUTPUTS_PREFIX = "outputs_sov/full_output"
+SOV_EXTRACTED_OUTPUTS_PREFIX = "outputs_sov/extracted_output"
+CYTORA_MAIN_FILE_NAME = f"{GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME}_main"
+CYTORA_SOV_FILE_NAME = f"{GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME}_sov"
 
 TIMESTAMP_FORMAT_MILLISECONDS = "%Y%m%d%H%M%S%f"
 DEFAULT_DATE_FORMAT = "%Y%m%d"
@@ -64,10 +72,10 @@ def start_cytora_job(
     return job_id
 
 
-def save_cytora_output_to_blob_storage(output: dict, key_prefix: str):
+def save_cytora_output_to_blob_storage(output: dict, key_prefix: str, job_id: str):
     ts = datetime.now().strftime(TIMESTAMP_FORMAT_MILLISECONDS)[:-3]
     output["TimeProcessed"] = ts
-    key = f"{key_prefix}/{ts}_{output['job_id']}.json"
+    key = f"{key_prefix}/{ts}_{job_id}.json"
     output_json = json.dumps(output, indent=2)
     write_string_to_file(OUTPUT_BLOB_CONTAINER, key, output_json)
     return key
@@ -106,6 +114,28 @@ def get_missing_mapping_keys(cytora_instance: CytoraHook) -> set[str]:
     mapping_keys = [value[0] for value in CYTORA_OUTPUT_FIELD_MAP_MAIN.values()]
     required_output_fields = cytora_instance.get_schema_required_output_fields()
     return set(mapping_keys) - set(required_output_fields)
+
+
+def extract_sov_outputs(output: dict):
+    sov_fields = output.get("fields", {}) or {}
+    sov_rows = extract_sov_from_flat_fields(sov_fields)
+
+    return sov_rows
+
+
+def extract_sov_from_flat_fields(fields: dict):
+    row_map = defaultdict(dict)
+    pattern = re.compile(r"^property_list\.property_details\[(\d+)\]\.(.+)$")
+    for key, field_obj in fields.items():
+        m = pattern.match(key)
+        if not m:
+            continue
+        idx = int(m.group(1)); col = m.group(2)
+        if isinstance(field_obj, dict):
+            row_map[idx][col] = field_obj.get("value")
+        else:
+            row_map[idx][col] = field_obj
+    return [row_map[i] for i in sorted(row_map.keys())]
 
 
 @dag(
@@ -170,104 +200,202 @@ def process_email_change_notifications():
 
         logger.info("Email eml file saved to blob storage: %s", email_blob_path)
 
-    @task
-    def start_cytora_main_job(email_id: str, dag_run: DagRun | None = None):
-        """
-        Uploads an email EML file from blob storage to Cytora for processing, and starts the cytora main job.
+    @task_group(group_id="main_flow")
+    def run_main_flow(email_ids: list[str]):
+        @task
+        def start_cytora_main_job(email_id: str, dag_run: DagRun | None = None):
+            """
+            Uploads an email EML file from blob storage to Cytora for processing, and starts the cytora main job.
 
-        Args:
-            email_id (str): The ID of the email whose EML file should be uploaded.
-        """
-        run_id = dag_run.run_id
-        cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
+            Args:
+                email_id (str): The ID of the email whose EML file should be uploaded.
+            """
+            run_id = dag_run.run_id
+            cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
 
-        missing_mapping_keys = get_missing_mapping_keys(cytora_instance=cytora_main)
+            missing_mapping_keys = get_missing_mapping_keys(cytora_instance=cytora_main)
 
-        if missing_mapping_keys:
-            raise AirflowFailException(
-                f"Invalid Cytora field mapping: missing keys {sorted(missing_mapping_keys)}. "
-                f"Update the schema or CYTORA_OUTPUT_FIELD_MAP_MAIN."
-            )
+            if missing_mapping_keys:
+                raise AirflowFailException(
+                    f"Invalid Cytora field mapping: missing keys {sorted(missing_mapping_keys)}. "
+                    f"Update the schema or CYTORA_OUTPUT_FIELD_MAP_MAIN."
+                )
 
-        status, upload_id = upload_stream_to_cytora(
-            email_id=email_id,
-            media_type=MEDIA_TYPE,
-            cytora_instance=cytora_main,
-            dag_run_id=run_id,
-        )
-        if status != 200:
-            raise AirflowException(
-                f"Failed to upload file to Cytora with HTTP status: {status}"
-            )
-
-        try:
-            main_job_id = start_cytora_job(
-                cytora_instance=cytora_main,
-                upload_id=upload_id,
-                file_name=GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME,
+            status, upload_id = upload_stream_to_cytora(
+                email_id=email_id,
                 media_type=MEDIA_TYPE,
+                cytora_instance=cytora_main,
+                dag_run_id=run_id,
             )
-        except Exception as e:
-            raise AirflowException(f"Failed to start Cytora main job: {e}")
+            if status != 200:
+                raise AirflowException(
+                    f"Failed to upload file to Cytora with HTTP status: {status}"
+                )
 
-        logger.info(f"Starting cytora main job with id {main_job_id}")
+            try:
+                main_job_id = start_cytora_job(
+                    cytora_instance=cytora_main,
+                    upload_id=upload_id,
+                    file_name=CYTORA_MAIN_FILE_NAME,
+                    media_type=MEDIA_TYPE,
+                )
+            except Exception as e:
+                raise AirflowException(f"Failed to start Cytora main job: {e}")
 
-        return main_job_id
+            logger.info(f"Starting cytora main job with id {main_job_id}")
 
-    @task
-    def save_cytora_job_output(job_id: str):
-        """
-        Retrieve Cytora output and saves the result to blob storage.
+            return main_job_id
 
-        Args:
-            job_id (str): The Cytora job ID to fetch output for.
-        """
-        cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
-        output = cytora_main.get_result_for_schema_job(job_id)
+        @task
+        def save_cytora_main_job_output(job_id: str):
+            """
+            Retrieve Cytora output and saves the result to blob storage.
 
-        if not output:
-            raise AirflowFailException(
-                f"No output returned for Cytora job {job_id}. Status may be errored or under human review."
+            Args:
+                job_id (str): The Cytora job ID to fetch output for.
+            """
+            cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
+            output = cytora_main.get_result_for_schema_job(job_id)
+
+            if not output:
+                raise AirflowFailException(
+                    f"No output returned for Cytora job {job_id}. Status may be errored or under human review."
+                )
+
+            try:
+                full_output_key = save_cytora_output_to_blob_storage(
+                    output=output, key_prefix=MAIN_FULL_OUTPUTS_PREFIX, job_id=job_id
+                )
+            except Exception as e:
+                raise AirflowException(
+                    f"Failed to save full output for job {job_id} to blob storage: {e}"
+                )
+
+            extracted_output = extract_main_outputs(output)
+            try:
+                extracted_output_key = save_cytora_output_to_blob_storage(
+                    output=extracted_output, key_prefix=MAIN_EXTRACTED_OUTPUTS_PREFIX, job_id=job_id
+                )
+            except Exception as e:
+                raise AirflowException(
+                    f"Failed to save extracted output for job {job_id} to blob storage: {e}"
+                )
+
+            return full_output_key, extracted_output_key
+
+        cytora_main_job_ids = start_cytora_main_job.expand(email_id=email_ids)
+        main_output_keys = save_cytora_main_job_output.expand(job_id=cytora_main_job_ids)
+        wait_for_main_job = CytoraApiStatusSensorOperator.partial(
+            task_id="wait_for_main_cytora_api_status",
+            cytora_schema=CYTORA_SCHEMA_MAIN,
+        ).expand(job_id=cytora_main_job_ids)
+
+        cytora_main_job_ids >> wait_for_main_job >> main_output_keys
+
+
+    @task_group(group_id="sov_flow")
+    def run_sov_flow(email_ids: list[str]):
+        @task
+        def start_cytora_sov_job(email_id: str, dag_run: DagRun | None = None):
+            """
+            Uploads an email EML file from blob storage to Cytora for processing, and starts the cytora sov job.
+
+            Args:
+                email_id (str): The ID of the email whose EML file should be uploaded.
+            """
+            run_id = dag_run.run_id
+            cytora_sov = CytoraHook(CYTORA_SCHEMA_SOV)
+            status, upload_id = upload_stream_to_cytora(
+                email_id=email_id,
+                media_type=MEDIA_TYPE,
+                cytora_instance=cytora_sov,
+                dag_run_id=run_id,
             )
+            if status != 200:
+                raise AirflowException(
+                    f"Failed to upload file to Cytora with HTTP status: {status}"
+                )
 
-        try:
-            full_output_key = save_cytora_output_to_blob_storage(
-                output=output, key_prefix=MAIN_FULL_OUTPUTS_PREFIX
-            )
-        except Exception as e:
-            raise AirflowException(
-                f"Failed to save full output for job {job_id} to blob storage: {e}"
-            )
+            try:
+                sov_job_id = start_cytora_job(
+                    cytora_instance=cytora_sov,
+                    upload_id=upload_id,
+                    file_name=CYTORA_SOV_FILE_NAME,
+                    media_type=MEDIA_TYPE,
+                )
+            except Exception as e:
+                raise AirflowException(f"Failed to start Cytora sov job: {e}")
 
-        extracted_output = extract_outputs(output)
-        try:
-            extracted_output_key = save_cytora_output_to_blob_storage(
-                output=extracted_output, key_prefix=MAIN_EXTRACTED_OUTPUTS_PREFIX
-            )
-        except Exception as e:
-            raise AirflowException(
-                f"Failed to save extracted output for job {job_id} to blob storage: {e}"
-            )
+            logger.info(f"Starting cytora sov job with id {sov_job_id}")
 
-        return full_output_key, extracted_output_key
+            return sov_job_id
+
+        @task
+        def save_cytora_sov_job_output(job_id: str):
+            """
+            Retrieve Cytora output and saves the result to blob storage.
+
+            Args:
+                job_id (str): The Cytora job ID to fetch output for.
+            """
+            cytora_sov = CytoraHook(CYTORA_SCHEMA_SOV)
+            output = cytora_sov.get_result_for_schema_job(job_id)
+
+            if not output:
+                raise AirflowFailException(
+                    f"No output returned for Cytora job {job_id}. Status may be errored or under human review."
+                )
+
+            try:
+                full_output_key = save_cytora_output_to_blob_storage(
+                    output=output, key_prefix=SOV_FULL_OUTPUTS_PREFIX, job_id=job_id
+                )
+            except Exception as e:
+                raise AirflowException(
+                    f"Failed to save full output for job {job_id} to blob storage: {e}"
+                )
+
+            extracted_output_list = extract_sov_outputs(output)
+            extracted_output_dict = {f"sov_row_{i + 1}": row for i, row in enumerate(extracted_output_list)}
+
+            if not extracted_output_dict:
+                return full_output_key, None
+
+            try:
+                extracted_output_key = save_cytora_output_to_blob_storage(
+                    output=extracted_output_dict, key_prefix=SOV_EXTRACTED_OUTPUTS_PREFIX, job_id=job_id
+                )
+            except Exception as e:
+                raise AirflowException(
+                    f"Failed to save extracted output for job {job_id} to blob storage: {e}"
+                )
+
+            return full_output_key, extracted_output_key
+
+        cytora_sov_job_ids = start_cytora_sov_job.expand(email_id=email_ids)
+        sov_output_keys = save_cytora_sov_job_output.expand(job_id=cytora_sov_job_ids)
+        wait_for_sov_job = CytoraApiStatusSensorOperator.partial(
+            task_id="wait_for_sov_cytora_api_status",
+            cytora_schema=CYTORA_SCHEMA_SOV,
+        ).expand(job_id=cytora_sov_job_ids)
+
+        cytora_sov_job_ids >> wait_for_sov_job >> sov_output_keys
 
     email_ids = get_email_ids()
 
     email_eml_file_task_instance = download_email_eml_file.expand(email_id=email_ids)
-    cytora_main_job_ids = start_cytora_main_job.expand(email_id=email_ids)
-    cytora_output_keys = save_cytora_job_output.expand(job_id=cytora_main_job_ids)
-
-    wait_for_main_job = CytoraApiStatusSensorOperator.partial(
-        task_id="wait_for_main_cytora_api_status",
-        cytora_schema=CYTORA_SCHEMA_MAIN,
-    ).expand(job_id=cytora_main_job_ids)
+    cytora_main_flow = run_main_flow(email_ids=email_ids)
+    cytora_sov_flow = run_sov_flow(email_ids=email_ids)
 
     (
-        email_eml_file_task_instance
-        >> cytora_main_job_ids
-        >> wait_for_main_job
-        >> cytora_output_keys
+        email_ids
+        >> email_eml_file_task_instance
+        >> [cytora_main_flow, cytora_sov_flow]
     )
+
+    end = EmptyOperator(task_id="end", trigger_rule="none_failed_min_one_success")
+    [cytora_main_flow, cytora_sov_flow] >> end
+
 
 
 process_email_change_notifications()

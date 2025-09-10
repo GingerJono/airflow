@@ -9,6 +9,7 @@ from airflow.hooks.base import BaseHook
 CYTORA_CONNECTION_ID = "cytora"
 CYTORA_AUTH_URL = "https://token.cytora.com/oauth/token"
 CYTORA_SCHEMA_MAIN = "ds:cfg:wr2pxXtxctBgFaZP"
+CYTORA_SCHEMA_SOV = "ds:cfg:LAXxpzGexUBzNxE4"
 
 CYTORA_API_POLL_INTERVAL = 30
 CYTORA_API_TIMEOUT = 1800
