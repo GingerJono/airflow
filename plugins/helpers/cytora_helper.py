@@ -6,11 +6,48 @@ import requests
 from airflow.exceptions import AirflowException, AirflowFailException
 from airflow.hooks.base import BaseHook
 
-from utilities.utility_helper import to_str_or_none, parse_date_or_none
-
 CYTORA_CONNECTION_ID = "cytora"
 CYTORA_AUTH_URL = "https://token.cytora.com/oauth/token"
 CYTORA_SCHEMA_MAIN = "ds:cfg:wr2pxXtxctBgFaZP"
+
+CYTORA_API_POLL_INTERVAL = 30
+CYTORA_API_TIMEOUT = 1800
+
+logger = logging.getLogger(__name__)
+
+DATETIME_FORMATS = [
+    "%d/%m/%Y",
+    "%Y-%m-%d",
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%dT%H:%M:%S.%fZ",
+]
+
+
+def get_field_value(output: dict, key: str):
+    try:
+        node = output.get("fields", {}).get(key, {})
+        return node.get("value")
+    except Exception:
+        return None
+
+
+def to_str_or_none(v):
+    return None if v is None else str(v)
+
+
+def parse_date_or_none(v):
+    if not v:
+        return None
+    s = str(v).strip()
+    from datetime import datetime as dt
+
+    for fmt in DATETIME_FORMATS:
+        try:
+            return dt.strptime(s[: len(fmt)], fmt).date()
+        except Exception:
+            continue
+    return None
+
 
 CYTORA_OUTPUT_FIELD_MAP_MAIN = {
     "OutputInsuredName": ("insured_name", to_str_or_none),
@@ -32,11 +69,6 @@ CYTORA_OUTPUT_FIELD_MAP_MAIN = {
     "OutputNewRenewal": ("new_vs_renewal", to_str_or_none),
     "OutputRenewedFrom": ("renewed_from", to_str_or_none),
 }
-
-CYTORA_API_POLL_INTERVAL = 30
-CYTORA_API_TIMEOUT = 1800
-
-logger = logging.getLogger(__name__)
 
 
 class CytoraHook:

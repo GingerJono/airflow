@@ -10,7 +10,12 @@ from airflow.models.param import Param
 from email_monitoring.cytora_api_status_sensor_operator import (
     CytoraApiStatusSensorOperator,
 )
-from helpers.cytora_helper import CYTORA_SCHEMA_MAIN, CytoraHook
+from helpers.cytora_helper import (
+    CYTORA_OUTPUT_FIELD_MAP_MAIN,
+    CYTORA_SCHEMA_MAIN,
+    CytoraHook,
+    get_field_value,
+)
 from utilities.blob_storage_helper import (
     read_file_as_bytes,
     write_bytes_to_file,
@@ -19,9 +24,6 @@ from utilities.blob_storage_helper import (
 from utilities.msgraph_helper import (
     get_eml_file_from_email_id,
 )
-
-from utilities.cytora_helper import CYTORA_OUTPUT_FIELD_MAP_MAIN
-from utilities.utility_helper import get_field_value
 
 NUM_RETRIES = 2
 RETRY_DELAY_MINS = 3
@@ -85,9 +87,7 @@ def extract_outputs(output: dict):
             extracted_outputs[output_key] = transform_fn(gv(gv_key))
         extracted_outputs["job_id"] = output["job_id"]
     except Exception as e:
-        raise AirflowException(
-            f"Failed to extract outpus: {e}"
-        )
+        raise AirflowException(f"Failed to extract outpus: {e}")
 
     return extracted_outputs
 
@@ -213,7 +213,6 @@ def process_email_change_notifications():
             raise AirflowException(
                 f"Failed to save full output for job {job_id} to blob storage: {e}"
             )
-
 
         extracted_output = extract_outputs(output)
         try:
