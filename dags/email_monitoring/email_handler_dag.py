@@ -10,12 +10,9 @@ from airflow.models.param import Param
 from email_monitoring.cytora_api_status_sensor_operator import (
     CytoraApiStatusSensorOperator,
 )
-from helpers.cytora_helper import (
-    CYTORA_OUTPUT_FIELD_MAP_MAIN,
-    CYTORA_SCHEMA_MAIN,
-    CytoraHook,
-    get_field_value,
-)
+from helpers.cytora_helper import CYTORA_SCHEMA_MAIN, CytoraHook
+from helpers.cytora_mappings import CYTORA_OUTPUT_FIELD_MAP_MAIN
+from helpers.utils import get_field_value
 from utilities.blob_storage_helper import (
     read_file_as_bytes,
     write_bytes_to_file,
@@ -77,17 +74,22 @@ def save_cytora_output_to_blob_storage(output: dict, key_prefix: str):
 
 
 def extract_outputs(output: dict):
-    def gv(k):
-        return get_field_value(output, k)
+    def get_output_value_from_key(key):
+        return get_field_value(output, key)
 
     extracted_outputs = {}
 
     try:
-        for output_key, (gv_key, transform_fn) in CYTORA_OUTPUT_FIELD_MAP_MAIN.items():
-            extracted_outputs[output_key] = transform_fn(gv(gv_key))
+        for output_key, (
+            input_key,
+            transform_fn,
+        ) in CYTORA_OUTPUT_FIELD_MAP_MAIN.items():
+            extracted_outputs[output_key] = transform_fn(
+                get_output_value_from_key(input_key)
+            )
         extracted_outputs["job_id"] = output["job_id"]
     except Exception as e:
-        raise AirflowException(f"Failed to extract outpus: {e}")
+        raise AirflowException(f"Failed to extract outputs: {e}")
 
     return extracted_outputs
 
