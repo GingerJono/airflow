@@ -94,6 +94,20 @@ def extract_outputs(output: dict):
     return extracted_outputs
 
 
+def get_missing_mapping_keys(cytora_instance: CytoraHook) -> set[str]:
+    """
+    Return the set of mapping keys that are not present in the required
+    output fields of the Cytora schema.
+
+    Mapping keys are taken from the first element of each tuple in
+    CYTORA_OUTPUT_FIELD_MAP_MAIN.values().
+    """
+
+    mapping_keys = [value[0] for value in CYTORA_OUTPUT_FIELD_MAP_MAIN.values()]
+    required_output_fields = cytora_instance.get_schema_required_output_fields()
+    return set(mapping_keys)-set(required_output_fields)
+
+
 @dag(
     params={"email_ids": Param(["email-1", "email-2"], type="array")},
     default_args={
@@ -166,6 +180,15 @@ def process_email_change_notifications():
         """
         run_id = dag_run.run_id
         cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
+
+        missing_mapping_keys = get_missing_mapping_keys(cytora_instance=cytora_main)
+
+        if missing_mapping_keys:
+            raise AirflowFailException(
+                f"Invalid Cytora field mapping: missing keys {sorted(missing_mapping_keys)}. "
+                f"Update the schema or CYTORA_OUTPUT_FIELD_MAP_MAIN."
+            )
+
         status, upload_id = upload_stream_to_cytora(
             email_id=email_id,
             media_type=MEDIA_TYPE,

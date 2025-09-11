@@ -1,5 +1,12 @@
 from helpers.utils import safe_parse_date, safe_stringify
 
+# Mapping of database column names (keys) to Cytora output fields.
+#
+# - The dict key is the column name we store in our DB.
+# - The first element of each tuple is the field key as defined in the Cytora schema.
+# - The second element of each tuple is a transformation function applied to
+#   the raw Cytora value before storing.
+
 CYTORA_OUTPUT_FIELD_MAP_MAIN = {
     "OutputInsuredName": ("insured_name", safe_stringify),
     "OutputInsuredDomicile": ("insured_domicile", safe_stringify),
