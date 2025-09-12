@@ -202,6 +202,15 @@ def process_email_change_notifications():
 
     @task_group(group_id="main_flow")
     def run_main_flow(email_ids: list[str]):
+        """
+        TaskGroup: main_flow
+
+        This task group includes the tasks for the cytora main flow.
+        Including uploading the eml files to Cytora,
+        starting the main schema job, waiting for job completion,
+        and saving the processed output to blob storage.
+        """
+
         @task
         def start_cytora_main_job(email_id: str, dag_run: DagRun | None = None):
             """
@@ -298,6 +307,15 @@ def process_email_change_notifications():
 
     @task_group(group_id="sov_flow")
     def run_sov_flow(email_ids: list[str]):
+        """
+        TaskGroup: sov_flow
+
+        This task group includes the tasks for the cytora sov flow.
+        Including uploading the eml files to Cytora,
+        starting the sov schema job, waiting for job completion,
+        and saving the processed output to blob storage.
+        """
+
         @task
         def start_cytora_sov_job(email_id: str, dag_run: DagRun | None = None):
             """
