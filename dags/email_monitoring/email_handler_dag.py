@@ -13,10 +13,9 @@ from airflow.operators.empty import EmptyOperator
 from email_monitoring.cytora_api_status_sensor_operator import (
     CytoraApiStatusSensorOperator,
 )
-from helpers.cytora_helper import CYTORA_SCHEMA_MAIN, CytoraHook
+from helpers.cytora_helper import CYTORA_SCHEMA_MAIN, CYTORA_SCHEMA_SOV, CytoraHook
 from helpers.cytora_mappings import CYTORA_OUTPUT_FIELD_MAP_MAIN
 from helpers.utils import get_field_value
-
 from utilities.blob_storage_helper import (
     read_file_as_bytes,
     write_bytes_to_file,
@@ -81,7 +80,7 @@ def save_cytora_output_to_blob_storage(output: dict, key_prefix: str, job_id: st
     return key
 
 
-def extract_outputs(output: dict):
+def extract_main_outputs(output: dict):
     def get_output_value_from_key(key):
         return get_field_value(output, key)
 
@@ -130,7 +129,8 @@ def extract_sov_from_flat_fields(fields: dict):
         m = pattern.match(key)
         if not m:
             continue
-        idx = int(m.group(1)); col = m.group(2)
+        idx = int(m.group(1))
+        col = m.group(2)
         if isinstance(field_obj, dict):
             row_map[idx][col] = field_obj.get("value")
         else:
@@ -274,7 +274,9 @@ def process_email_change_notifications():
             extracted_output = extract_main_outputs(output)
             try:
                 extracted_output_key = save_cytora_output_to_blob_storage(
-                    output=extracted_output, key_prefix=MAIN_EXTRACTED_OUTPUTS_PREFIX, job_id=job_id
+                    output=extracted_output,
+                    key_prefix=MAIN_EXTRACTED_OUTPUTS_PREFIX,
+                    job_id=job_id,
                 )
             except Exception as e:
                 raise AirflowException(
@@ -284,14 +286,15 @@ def process_email_change_notifications():
             return full_output_key, extracted_output_key
 
         cytora_main_job_ids = start_cytora_main_job.expand(email_id=email_ids)
-        main_output_keys = save_cytora_main_job_output.expand(job_id=cytora_main_job_ids)
+        main_output_keys = save_cytora_main_job_output.expand(
+            job_id=cytora_main_job_ids
+        )
         wait_for_main_job = CytoraApiStatusSensorOperator.partial(
             task_id="wait_for_main_cytora_api_status",
             cytora_schema=CYTORA_SCHEMA_MAIN,
         ).expand(job_id=cytora_main_job_ids)
 
         cytora_main_job_ids >> wait_for_main_job >> main_output_keys
-
 
     @task_group(group_id="sov_flow")
     def run_sov_flow(email_ids: list[str]):
@@ -356,14 +359,18 @@ def process_email_change_notifications():
                 )
 
             extracted_output_list = extract_sov_outputs(output)
-            extracted_output_dict = {f"sov_row_{i + 1}": row for i, row in enumerate(extracted_output_list)}
+            extracted_output_dict = {
+                f"sov_row_{i + 1}": row for i, row in enumerate(extracted_output_list)
+            }
 
             if not extracted_output_dict:
                 return full_output_key, None
 
             try:
                 extracted_output_key = save_cytora_output_to_blob_storage(
-                    output=extracted_output_dict, key_prefix=SOV_EXTRACTED_OUTPUTS_PREFIX, job_id=job_id
+                    output=extracted_output_dict,
+                    key_prefix=SOV_EXTRACTED_OUTPUTS_PREFIX,
+                    job_id=job_id,
                 )
             except Exception as e:
                 raise AirflowException(
@@ -387,15 +394,10 @@ def process_email_change_notifications():
     cytora_main_flow = run_main_flow(email_ids=email_ids)
     cytora_sov_flow = run_sov_flow(email_ids=email_ids)
 
-    (
-        email_ids
-        >> email_eml_file_task_instance
-        >> [cytora_main_flow, cytora_sov_flow]
-    )
+    (email_ids >> email_eml_file_task_instance >> [cytora_main_flow, cytora_sov_flow])
 
     end = EmptyOperator(task_id="end", trigger_rule="none_failed_min_one_success")
     [cytora_main_flow, cytora_sov_flow] >> end
-
 
 
 process_email_change_notifications()
