@@ -11,6 +11,8 @@ from email_monitoring.cytora_api_status_sensor_operator import (
     CytoraApiStatusSensorOperator,
 )
 from helpers.cytora_helper import CYTORA_SCHEMA_MAIN, CytoraHook
+from helpers.cytora_mappings import CYTORA_OUTPUT_FIELD_MAP_MAIN
+from helpers.utils import get_field_value
 from utilities.blob_storage_helper import (
     read_file_as_bytes,
     write_bytes_to_file,
@@ -30,7 +32,8 @@ OUTPUT_BLOB_CONTAINER = "cytora-output"
 GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME = "graph_message_eml_response_raw"
 MEDIA_TYPE = "message/rfc822"
 
-MAIN_OUTPUTS_PREFIX = "outputs_main"
+MAIN_FULL_OUTPUTS_PREFIX = "outputs_main/full_output"
+MAIN_EXTRACTED_OUTPUTS_PREFIX = "outputs_main/extracted_output"
 
 TIMESTAMP_FORMAT_MILLISECONDS = "%Y%m%d%H%M%S%f"
 DEFAULT_DATE_FORMAT = "%Y%m%d"
@@ -68,6 +71,41 @@ def save_cytora_output_to_blob_storage(output: dict, key_prefix: str):
     output_json = json.dumps(output, indent=2)
     write_string_to_file(OUTPUT_BLOB_CONTAINER, key, output_json)
     return key
+
+
+def extract_outputs(output: dict):
+    def get_output_value_from_key(key):
+        return get_field_value(output, key)
+
+    extracted_outputs = {}
+
+    try:
+        for output_key, (
+            input_key,
+            transform_fn,
+        ) in CYTORA_OUTPUT_FIELD_MAP_MAIN.items():
+            extracted_outputs[output_key] = transform_fn(
+                get_output_value_from_key(input_key)
+            )
+        extracted_outputs["job_id"] = output["job_id"]
+    except Exception as e:
+        raise AirflowException(f"Failed to extract outputs: {e}")
+
+    return extracted_outputs
+
+
+def get_missing_mapping_keys(cytora_instance: CytoraHook) -> set[str]:
+    """
+    Return the set of mapping keys that are not present in the required
+    output fields of the Cytora schema.
+
+    Mapping keys are taken from the first element of each tuple in
+    CYTORA_OUTPUT_FIELD_MAP_MAIN.values().
+    """
+
+    mapping_keys = [value[0] for value in CYTORA_OUTPUT_FIELD_MAP_MAIN.values()]
+    required_output_fields = cytora_instance.get_schema_required_output_fields()
+    return set(mapping_keys) - set(required_output_fields)
 
 
 @dag(
@@ -142,6 +180,15 @@ def process_email_change_notifications():
         """
         run_id = dag_run.run_id
         cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
+
+        missing_mapping_keys = get_missing_mapping_keys(cytora_instance=cytora_main)
+
+        if missing_mapping_keys:
+            raise AirflowFailException(
+                f"Invalid Cytora field mapping: missing keys {sorted(missing_mapping_keys)}. "
+                f"Update the schema or CYTORA_OUTPUT_FIELD_MAP_MAIN."
+            )
+
         status, upload_id = upload_stream_to_cytora(
             email_id=email_id,
             media_type=MEDIA_TYPE,
@@ -184,15 +231,25 @@ def process_email_change_notifications():
             )
 
         try:
-            key = save_cytora_output_to_blob_storage(
-                output=output, key_prefix=MAIN_OUTPUTS_PREFIX
+            full_output_key = save_cytora_output_to_blob_storage(
+                output=output, key_prefix=MAIN_FULL_OUTPUTS_PREFIX
             )
         except Exception as e:
             raise AirflowException(
-                f"Failed to save output for job {job_id} to blob storage: {e}"
+                f"Failed to save full output for job {job_id} to blob storage: {e}"
             )
 
-        return key
+        extracted_output = extract_outputs(output)
+        try:
+            extracted_output_key = save_cytora_output_to_blob_storage(
+                output=extracted_output, key_prefix=MAIN_EXTRACTED_OUTPUTS_PREFIX
+            )
+        except Exception as e:
+            raise AirflowException(
+                f"Failed to save extracted output for job {job_id} to blob storage: {e}"
+            )
+
+        return full_output_key, extracted_output_key
 
     email_ids = get_email_ids()
 

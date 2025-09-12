@@ -161,3 +161,16 @@ class CytoraHook:
             except Exception as fetch_err:
                 logger.debug(f"No output could be retrieved: {fetch_err}")
             return None
+
+    def get_schema_config_list(self):
+        url = f"{self.cytora_url_prefix}/digitize/workspaces/{self.workspace}/schemas/configs/{self.schema_config_id}/output-json-schema"
+        headers = self._get_headers()
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        return data
+
+    def get_schema_required_output_fields(self):
+        schema_config_list = self.get_schema_config_list()
+        if schema_config_list is not None:
+            return schema_config_list["json_schema"]["required"]
