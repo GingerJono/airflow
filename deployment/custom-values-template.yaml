@@ -300,17 +300,17 @@ airflow:
 
     CYTORA_WORKSPACE:
       kind: "configmap"
-      name: "cytora-connection-configs"
+      name: "cytora-connection-configuration"
       key: "workspace"
 
     CYTORA_AUTH_AUDIENCE:
       kind: "configmap"
-      name: "cytora-connection-configs"
+      name: "cytora-connection-configuration"
       key: "auth_audience"
 
     CYTORA_URL_PREFIX:
       kind: "configmap"
-      name: "cytora-connection-configs"
+      name: "cytora-connection-configuration"
       key: "url_prefix"
 
 
