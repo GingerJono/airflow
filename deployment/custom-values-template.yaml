@@ -232,8 +232,8 @@ airflow:
       password: "${CYTORA_CLIENT_SECRET}"
       extra: |
         {
-          "url_prefix": "${CYTORA_URL_PREFIX}"
-          "workspace": "${CYTORA_WORKSPACE}"
+          "url_prefix": "${CYTORA_URL_PREFIX}",
+          "workspace": "${CYTORA_WORKSPACE}",
           "auth_audience": "${CYTORA_AUTH_AUDIENCE}"
         }
 
