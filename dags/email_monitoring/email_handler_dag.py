@@ -165,7 +165,7 @@ def fetch_expiring_slip_to_blob_storage( programme_ref: str, yoa: int) -> tuple[
     sample_file_name = "Slip 2023.pdf"
 
     dag_dir = os.path.dirname(__file__)
-    file_path = os.path.join(dag_dir, sample_file_name)  # 👈 store your sample file in the repo
+    file_path = os.path.join(dag_dir, sample_file_name)
 
     if not os.path.exists(file_path):
         logger.warning("Test slip file not found at %s", file_path)
@@ -176,7 +176,6 @@ def fetch_expiring_slip_to_blob_storage( programme_ref: str, yoa: int) -> tuple[
 
     file_name = os.path.basename(file_path)
 
-    # Use timestamp to avoid collisions
     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")[:-3]
     blob_name = f"{timestamp}_{file_name}"
 
@@ -290,6 +289,13 @@ def process_email_change_notifications():
 
     @task
     def upload_email_eml_file_to_cytora(email_id: str, dag_run: DagRun | None = None):
+        """
+        Retrieves the eml file of an email from blob storage, upload it and create
+        a file on Cytora.
+
+        Args:
+            email_id (str): The id of the email to retrieve from MS Graph
+        """
         cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
         run_id = dag_run.run_id
         blob_name = f"{run_id}/{email_id}/{GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME}"
@@ -318,15 +324,14 @@ def process_email_change_notifications():
         TaskGroup: main_flow
 
         This task group includes the tasks for the cytora main flow.
-        Including uploading the eml files to Cytora,
-        starting the main schema job, waiting for job completion,
+        Including starting the main schema job, waiting for job completion,
         and saving the processed output to blob storage.
         """
 
         @task
         def start_cytora_main_job(file_id: str):
             """
-            Uploads an email EML file from blob storage to Cytora for processing, and starts the cytora main job.
+            Starts the cytora main job.
 
             Args:
                 email_id (str): The ID of the email whose EML file should be uploaded.
@@ -406,15 +411,14 @@ def process_email_change_notifications():
         TaskGroup: sov_flow
 
         This task group includes the tasks for the cytora sov flow.
-        Including uploading the eml files to Cytora,
-        starting the sov schema job, waiting for job completion,
+        Including starting the sov schema job, waiting for job completion,
         and saving the processed output to blob storage.
         """
 
         @task
         def start_cytora_sov_job(file_id: str):
             """
-            Uploads an email EML file from blob storage to Cytora for processing, and starts the cytora sov job.
+            Starts the cytora sov job.
 
             Args:
                 email_id (str): The ID of the email whose EML file should be uploaded.
@@ -491,16 +495,48 @@ def process_email_change_notifications():
 
     @task_group(group_id="renewal_flow")
     def run_renewal_flow(main_output_key: dict[str], email_eml_file_cytora_id: str):
+        """
+        TaskGroup: renewal_flow
 
+        This task group includes the tasks for the cytora renewal flow.
+        Including extracting renewal metadata, checking renewal flow trigger condition,
+        retrieving slip files, starting the  schema job (with or without slip file),
+        waiting for job completion, and saving the processed output to blob storage.
+        """
         @task
         def extract_renewal_metadata(main_output_key: dict[str]):
-            full_output_key = main_output_key["full"]
-            main_output_json_str = read_file_as_string(OUTPUT_BLOB_CONTAINER, full_output_key)
-            main_output = json.loads(main_output_json_str)
-            renewed_from_val = get_field_value(main_output, "renewed_from")
-            programme_ref, yoa = parse_programme_ref_and_yoa(renewed_from_val)
-            is_renewal = check_is_renewal(main_output)
-            return {"programme_ref": programme_ref, "yoa": yoa, "is_renewal": is_renewal}
+            """
+            Extract renewal metadata from the full Cytora main job output.
+
+            Args:
+               main_output_key (dict[str, str]): Dictionary containing blob storage keys
+               for main output files. Expected to include a "full" key.
+            """
+            try:
+                full_output_key = main_output_key.get("full")
+                if not full_output_key:
+                    raise KeyError("Missing required key 'full' in main_output_key")
+
+                logger.info("Reading full main output from blob storage: %s", full_output_key)
+                main_output_json_str = read_file_as_string(OUTPUT_BLOB_CONTAINER, full_output_key)
+
+                try:
+                    main_output = json.loads(main_output_json_str)
+                except json.JSONDecodeError as e:
+                    logger.error("Invalid JSON in %s: %s", full_output_key, e)
+                    raise AirflowFailException("Invalid JSON in main output") from e
+
+                renewed_from_val = get_field_value(main_output, "renewed_from")
+                programme_ref, yoa = parse_programme_ref_and_yoa(renewed_from_val)
+                is_renewal = check_is_renewal(main_output)
+
+                metadata = {"programme_ref": programme_ref, "yoa": yoa, "is_renewal": is_renewal}
+                logger.info("Extracted renewal metadata: %s", metadata)
+                return metadata
+
+            except Exception as e:
+                logger.error("Failed to extract renewal metadata: %s", e, exc_info=True)
+                raise AirflowFailException(f"extract_renewal_metadata failed: {e}") from e
 
         @task.short_circuit
         def check_if_should_start_renewal_flow(metadata: dict):
@@ -611,14 +647,10 @@ def process_email_change_notifications():
 
             return full_output_key, extracted_output_key
 
-        @task(trigger_rule="none_failed")
+        @task(trigger_rule="none_failed_min_one_success")
         def get_renewal_job_id(job_id_with_slip: str | None, job_id_email_only: str | None) -> str:
             return job_id_with_slip or job_id_email_only
 
-        # join = EmptyOperator(
-        #     task_id="join_renewal_job_ids",
-        #     trigger_rule="none_failed_min_one_success"
-        # )
 
         metadata = extract_renewal_metadata(main_output_key=main_output_key)
         should_start_renewal_flow = check_if_should_start_renewal_flow(metadata=metadata)
