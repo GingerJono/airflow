@@ -108,12 +108,12 @@ class CytoraHook:
         logger.info("File registered with Cytora.")
         return data["id"]
 
-    def create_schema_job(self, file_id, job_name):
-        logger.info(f"Creating schema job for file_id: {file_id}")
+    def create_schema_job(self, file_ids, job_name):
+        logger.info(f"Creating schema job for file_ids: {file_ids}")
         url = f"{self.cytora_url_prefix}/digitize/workspaces/{self.workspace}/schemas/jobs"
         payload = {
             "schema_config_id": self.schema_config_id,
-            "file_ids": [file_id],
+            "file_ids": file_ids,
             "name": job_name,
         }
         headers = self._get_headers()
@@ -124,6 +124,7 @@ class CytoraHook:
             )
         logger.info("Schema job created.")
         return response.json()["id"]
+
 
     def get_schema_job_status(self, job_id):
         url = f"{self.cytora_url_prefix}/digitize/workspaces/{self.workspace}/schemas/jobs/{job_id}"
