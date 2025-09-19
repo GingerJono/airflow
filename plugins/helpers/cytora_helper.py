@@ -125,7 +125,6 @@ class CytoraHook:
         logger.info("Schema job created.")
         return response.json()["id"]
 
-
     def get_schema_job_status(self, job_id):
         url = f"{self.cytora_url_prefix}/digitize/workspaces/{self.workspace}/schemas/jobs/{job_id}"
         headers = self._get_headers()
