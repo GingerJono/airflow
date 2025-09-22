@@ -24,6 +24,8 @@ from helpers.cytora_helper import (
 from helpers.cytora_mappings import CYTORA_OUTPUT_FIELD_MAP_MAIN
 from helpers.utils import get_field_value
 from utilities.blob_storage_helper import (
+    MONITORING_BLOB_CONTAINER,
+    OUTPUT_BLOB_CONTAINER,
     read_file_as_bytes,
     read_file_as_string,
     write_bytes_to_file,
@@ -32,8 +34,6 @@ from utilities.blob_storage_helper import (
 from utilities.msgraph_helper import (
     get_eml_file_from_email_id,
 )
-
-from utilities.blob_storage_helper import MONITORING_BLOB_CONTAINER, OUTPUT_BLOB_CONTAINER
 from utilities.sharepoint_helper import find_expiring_slip
 
 NUM_RETRIES = 2
@@ -150,9 +150,9 @@ def extract_sov_from_flat_fields(fields: dict):
     return [row_map[i] for i in sorted(row_map.keys())]
 
 
-def fetch_expiring_slip_to_blob_storage(
-) -> tuple[str | None, bytes | None, str | None]:
-
+def fetch_expiring_slip_to_blob_storage() -> tuple[
+    str | None, bytes | None, str | None
+]:
     sample_file_name = "Slip 2023.pdf"
 
     dag_dir = os.path.dirname(__file__)
@@ -569,11 +569,8 @@ def process_email_change_notifications():
             else:
                 return None, None, None
 
-
         @task
-        def start_cytora_renewal_job(
-            email_file_id: str, slip_info: tuple
-        ) -> str:
+        def start_cytora_renewal_job(email_file_id: str, slip_info: tuple) -> str:
             """
             Upload slip to Cytora, create files, and start a renewal schema job (email + slip).
             Returns the renewal job_id.
@@ -582,7 +579,6 @@ def process_email_change_notifications():
             slip_blob_name, slip_is_present, slip_name = slip_info
 
             if slip_is_present:
-
                 slip_media_type = guess_media_type(slip_name or "document.pdf")
 
                 status, slip_file_upload_id = upload_stream_to_cytora(
@@ -603,16 +599,23 @@ def process_email_change_notifications():
                 renewal_job_id = start_cytora_job(
                     cytora_instance=cytora_renewal,
                     file_ids=[email_file_id, slip_file_id],
-                    file_names=[CYTORA_RENEWAL_FILE_NAME, CYTORA_RENEWAL_SLIP_FILE_NAME],
+                    file_names=[
+                        CYTORA_RENEWAL_FILE_NAME,
+                        CYTORA_RENEWAL_SLIP_FILE_NAME,
+                    ],
                 )
-                logger.info("Started cytora renewal job with slip file: %s", renewal_job_id)
+                logger.info(
+                    "Started cytora renewal job with slip file: %s", renewal_job_id
+                )
             else:
                 renewal_job_id = start_cytora_job(
                     cytora_instance=cytora_renewal,
                     file_ids=[email_file_id],
                     file_names=[CYTORA_RENEWAL_FILE_NAME],
                 )
-                logger.info("Started cytora renewal job with email file: %s", renewal_job_id)
+                logger.info(
+                    "Started cytora renewal job with email file: %s", renewal_job_id
+                )
 
             return renewal_job_id
 
@@ -666,7 +669,9 @@ def process_email_change_notifications():
             metadata=metadata
         )
         slip_info = fetch_slip_files(metadata=metadata)
-        cytora_renewal_job_id = start_cytora_renewal_job(email_file_id=email_eml_file_cytora_id, slip_info=slip_info)
+        cytora_renewal_job_id = start_cytora_renewal_job(
+            email_file_id=email_eml_file_cytora_id, slip_info=slip_info
+        )
         renewal_output_keys = save_cytora_renewal_output(job_id=cytora_renewal_job_id)
         wait_for_cytora_renewal_job = CytoraApiStatusSensorOperator(
             task_id="wait_for_renewal_cytora_api_status",
@@ -674,7 +679,14 @@ def process_email_change_notifications():
             job_id=cytora_renewal_job_id,
         )
 
-        metadata >> should_start_renewal_flow >> slip_info >> cytora_renewal_job_id >> wait_for_cytora_renewal_job >> renewal_output_keys
+        (
+            metadata
+            >> should_start_renewal_flow
+            >> slip_info
+            >> cytora_renewal_job_id
+            >> wait_for_cytora_renewal_job
+            >> renewal_output_keys
+        )
 
     @task
     def zip_to_dicts(

@@ -11,6 +11,7 @@ MONITORING_BLOB_CONTAINER = "email-monitoring-data"
 OUTPUT_BLOB_CONTAINER = "cytora-output"
 DMS_DOWNLOADS_BLOB_CONTAINER = "dms-downloads"
 
+
 def write_string_to_file(container_name: str, blob_name: str, string_data: str):
     logger.info("Preparing to write string to blob %s", blob_name)
     logger.debug(
