@@ -6,6 +6,8 @@ from helpers.cytora_helper import CYTORA_API_POLL_INTERVAL, CYTORA_API_TIMEOUT
 
 
 class CytoraApiStatusSensorOperator(BaseOperator):
+    template_fields = ("job_id",)
+
     def __init__(
         self,
         cytora_schema: str,

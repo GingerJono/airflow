@@ -1,5 +1,6 @@
 import json
 import logging
+import mimetypes
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -13,24 +14,29 @@ from airflow.operators.empty import EmptyOperator
 from email_monitoring.cytora_api_status_sensor_operator import (
     CytoraApiStatusSensorOperator,
 )
-from helpers.cytora_helper import CYTORA_SCHEMA_MAIN, CYTORA_SCHEMA_SOV, CytoraHook
+from helpers.cytora_helper import (
+    CYTORA_SCHEMA_MAIN,
+    CYTORA_SCHEMA_RENEWAL,
+    CYTORA_SCHEMA_SOV,
+    CytoraHook,
+)
 from helpers.cytora_mappings import CYTORA_OUTPUT_FIELD_MAP_MAIN
 from helpers.utils import get_field_value
 from utilities.blob_storage_helper import (
+    MONITORING_BLOB_CONTAINER,
+    OUTPUT_BLOB_CONTAINER,
     read_file_as_bytes,
+    read_file_as_string,
     write_bytes_to_file,
     write_string_to_file,
 )
 from utilities.msgraph_helper import (
     get_eml_file_from_email_id,
 )
+from utilities.sharepoint_helper import find_expiring_slip
 
 NUM_RETRIES = 2
 RETRY_DELAY_MINS = 3
-
-
-MONITORING_BLOB_CONTAINER = "email-monitoring-data"
-OUTPUT_BLOB_CONTAINER = "cytora-output"
 
 GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME = "graph_message_eml_response_raw"
 MEDIA_TYPE = "message/rfc822"
@@ -39,8 +45,12 @@ MAIN_FULL_OUTPUTS_PREFIX = "outputs_main/full_output"
 MAIN_EXTRACTED_OUTPUTS_PREFIX = "outputs_main/extracted_output"
 SOV_FULL_OUTPUTS_PREFIX = "outputs_sov/full_output"
 SOV_EXTRACTED_OUTPUTS_PREFIX = "outputs_sov/extracted_output"
+RENEWAL_FULL_OUTPUTS_PREFIX = "outputs_renewal/full_output"
+RENEWAL_EXTRACTED_OUTPUTS_PREFIX = "outputs_renewal/extracted_output"
 CYTORA_MAIN_FILE_NAME = f"{GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME}_main"
 CYTORA_SOV_FILE_NAME = f"{GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME}_sov"
+CYTORA_RENEWAL_FILE_NAME = f"{GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME}_renewal"
+CYTORA_RENEWAL_SLIP_FILE_NAME = "slip_file"
 
 TIMESTAMP_FORMAT_MILLISECONDS = "%Y%m%d%H%M%S%f"
 DEFAULT_DATE_FORMAT = "%Y%m%d"
@@ -49,11 +59,11 @@ logger = logging.getLogger(__name__)
 
 
 def upload_stream_to_cytora(
-    email_id: str, media_type: str, cytora_instance: CytoraHook, dag_run_id: str = None
+    blob_name: str, container_name: str, media_type: str, cytora_instance: CytoraHook
 ):
     file_bytes = read_file_as_bytes(
-        container_name=MONITORING_BLOB_CONTAINER,
-        blob_name=f"{dag_run_id}/{email_id}/{GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME}",
+        container_name=container_name,
+        blob_name=blob_name,
     )
     upload_url, upload_id = cytora_instance.get_presigned_url()
     status = cytora_instance.upload_file(
@@ -63,11 +73,12 @@ def upload_stream_to_cytora(
 
 
 def start_cytora_job(
-    cytora_instance: CytoraHook, upload_id: str, file_name: str, media_type: str
+    cytora_instance: CytoraHook, file_names: list[str], file_ids: list[str]
 ):
-    file_id = cytora_instance.create_file(upload_id, file_name, media_type)
-    job_name = f"API {datetime.now().strftime(DEFAULT_DATE_FORMAT)}: {file_name}"
-    job_id = cytora_instance.create_schema_job(file_id, job_name)
+    job_name = (
+        f"API {datetime.now().strftime(DEFAULT_DATE_FORMAT)}: {' + '.join(file_names)}"
+    )
+    job_id = cytora_instance.create_schema_job(file_ids, job_name)
     return job_id
 
 
@@ -138,6 +149,47 @@ def extract_sov_from_flat_fields(fields: dict):
     return [row_map[i] for i in sorted(row_map.keys())]
 
 
+def parse_programme_ref_and_year_of_account(
+    renewed_from: str,
+) -> tuple[str | None, int | None]:
+    if not renewed_from:
+        return None, None
+    token = renewed_from.split(";", 1)[0].strip()
+    if len(token) < 9:
+        return None, None
+    programme_ref = token[:7]
+    yy = token[7:9]
+    if not yy.isdigit():
+        return programme_ref, None
+    y = int(yy)
+    year = 2000 + y
+    return programme_ref, year
+
+
+def check_is_renewal(output: dict) -> bool:
+    val = get_field_value(output, "new_vs_renewal")
+    if not val:
+        return False
+    return str(val).strip().lower() in {
+        "renewal",
+        "renewed",
+        "is_renewal",
+        "yes",
+        "true",
+    }
+
+
+def guess_media_type(filename: str) -> str:
+    mt, _ = mimetypes.guess_type(filename or "")
+    return mt or "application/octet-stream"
+
+
+def extract_renewal_outputs(output: dict):
+    renewal_terms = get_field_value(output, "renewal_terms_comparison")
+    extracted_renewal_output = {"renewal_terms_comparison": renewal_terms}
+    return extracted_renewal_output
+
+
 @dag(
     params={"email_ids": Param(["email-1", "email-2"], type="array")},
     default_args={
@@ -200,53 +252,63 @@ def process_email_change_notifications():
 
         logger.info("Email eml file saved to blob storage: %s", email_blob_path)
 
+    @task
+    def upload_email_eml_file_to_cytora(email_id: str, dag_run: DagRun | None = None):
+        """
+        Retrieves the eml file of an email from blob storage, upload it and create
+        a file on Cytora.
+
+        Args:
+            email_id (str): The id of the email to retrieve from MS Graph
+        """
+        cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
+        run_id = dag_run.run_id
+        blob_name = f"{run_id}/{email_id}/{GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME}"
+        status, upload_id = upload_stream_to_cytora(
+            blob_name=blob_name,
+            cytora_instance=cytora_main,
+            container_name=MONITORING_BLOB_CONTAINER,
+            media_type=MEDIA_TYPE,
+        )
+        if status != 200:
+            raise AirflowException(
+                f"Failed to upload file to Cytora with HTTP status: {status}"
+            )
+
+        try:
+            file_id = cytora_main.create_file(
+                upload_id, CYTORA_MAIN_FILE_NAME, MEDIA_TYPE
+            )
+        except Exception as e:
+            raise AirflowException(f"Failed to create file on Cytora: {e}")
+
+        return file_id
+
     @task_group(group_id="main_flow")
-    def run_main_flow(email_ids: list[str]):
+    def run_main_flow(file_id: str):
         """
         TaskGroup: main_flow
 
         This task group includes the tasks for the cytora main flow.
-        Including uploading the eml files to Cytora,
-        starting the main schema job, waiting for job completion,
+        Including starting the main schema job, waiting for job completion,
         and saving the processed output to blob storage.
         """
 
         @task
-        def start_cytora_main_job(email_id: str, dag_run: DagRun | None = None):
+        def start_cytora_main_job(file_id: str):
             """
-            Uploads an email EML file from blob storage to Cytora for processing, and starts the cytora main job.
+            Starts the cytora main job.
 
             Args:
                 email_id (str): The ID of the email whose EML file should be uploaded.
             """
-            run_id = dag_run.run_id
             cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
-
-            missing_mapping_keys = get_missing_mapping_keys(cytora_instance=cytora_main)
-
-            if missing_mapping_keys:
-                raise AirflowFailException(
-                    f"Invalid Cytora field mapping: missing keys {sorted(missing_mapping_keys)}. "
-                    f"Update the schema or CYTORA_OUTPUT_FIELD_MAP_MAIN."
-                )
-
-            status, upload_id = upload_stream_to_cytora(
-                email_id=email_id,
-                media_type=MEDIA_TYPE,
-                cytora_instance=cytora_main,
-                dag_run_id=run_id,
-            )
-            if status != 200:
-                raise AirflowException(
-                    f"Failed to upload file to Cytora with HTTP status: {status}"
-                )
 
             try:
                 main_job_id = start_cytora_job(
                     cytora_instance=cytora_main,
-                    upload_id=upload_id,
-                    file_name=CYTORA_MAIN_FILE_NAME,
-                    media_type=MEDIA_TYPE,
+                    file_names=[CYTORA_MAIN_FILE_NAME],
+                    file_ids=[file_id],
                 )
             except Exception as e:
                 raise AirflowException(f"Failed to start Cytora main job: {e}")
@@ -292,57 +354,47 @@ def process_email_change_notifications():
                     f"Failed to save extracted output for job {job_id} to blob storage: {e}"
                 )
 
-            return full_output_key, extracted_output_key
+            return {
+                "fullOutput": full_output_key,
+                "extractedOutput": extracted_output_key,
+            }
 
-        cytora_main_job_ids = start_cytora_main_job.expand(email_id=email_ids)
-        main_output_keys = save_cytora_main_job_output.expand(
-            job_id=cytora_main_job_ids
-        )
-        wait_for_main_job = CytoraApiStatusSensorOperator.partial(
+        cytora_main_job_id = start_cytora_main_job(file_id=file_id)
+        wait_for_main_job = CytoraApiStatusSensorOperator(
             task_id="wait_for_main_cytora_api_status",
             cytora_schema=CYTORA_SCHEMA_MAIN,
-        ).expand(job_id=cytora_main_job_ids)
+            job_id=cytora_main_job_id,
+        )
+        main_output_key = save_cytora_main_job_output(job_id=cytora_main_job_id)
 
-        cytora_main_job_ids >> wait_for_main_job >> main_output_keys
+        cytora_main_job_id >> wait_for_main_job >> main_output_key
+
+        return main_output_key
 
     @task_group(group_id="sov_flow")
-    def run_sov_flow(email_ids: list[str]):
+    def run_sov_flow(file_id: str):
         """
         TaskGroup: sov_flow
 
         This task group includes the tasks for the cytora sov flow.
-        Including uploading the eml files to Cytora,
-        starting the sov schema job, waiting for job completion,
+        Including starting the sov schema job, waiting for job completion,
         and saving the processed output to blob storage.
         """
 
         @task
-        def start_cytora_sov_job(email_id: str, dag_run: DagRun | None = None):
+        def start_cytora_sov_job(file_id: str):
             """
-            Uploads an email EML file from blob storage to Cytora for processing, and starts the cytora sov job.
+            Starts the cytora sov job.
 
             Args:
                 email_id (str): The ID of the email whose EML file should be uploaded.
             """
-            run_id = dag_run.run_id
             cytora_sov = CytoraHook(CYTORA_SCHEMA_SOV)
-            status, upload_id = upload_stream_to_cytora(
-                email_id=email_id,
-                media_type=MEDIA_TYPE,
-                cytora_instance=cytora_sov,
-                dag_run_id=run_id,
-            )
-            if status != 200:
-                raise AirflowException(
-                    f"Failed to upload file to Cytora with HTTP status: {status}"
-                )
-
             try:
                 sov_job_id = start_cytora_job(
                     cytora_instance=cytora_sov,
-                    upload_id=upload_id,
-                    file_name=CYTORA_SOV_FILE_NAME,
-                    media_type=MEDIA_TYPE,
+                    file_names=[CYTORA_SOV_FILE_NAME],
+                    file_ids=[file_id],
                 )
             except Exception as e:
                 raise AirflowException(f"Failed to start Cytora sov job: {e}")
@@ -397,25 +449,254 @@ def process_email_change_notifications():
 
             return full_output_key, extracted_output_key
 
-        cytora_sov_job_ids = start_cytora_sov_job.expand(email_id=email_ids)
-        sov_output_keys = save_cytora_sov_job_output.expand(job_id=cytora_sov_job_ids)
-        wait_for_sov_job = CytoraApiStatusSensorOperator.partial(
+        cytora_sov_job_id = start_cytora_sov_job(file_id=file_id)
+        sov_output_keys = save_cytora_sov_job_output(job_id=cytora_sov_job_id)
+        wait_for_sov_job = CytoraApiStatusSensorOperator(
             task_id="wait_for_sov_cytora_api_status",
             cytora_schema=CYTORA_SCHEMA_SOV,
-        ).expand(job_id=cytora_sov_job_ids)
+            job_id=cytora_sov_job_id,
+        )
 
-        cytora_sov_job_ids >> wait_for_sov_job >> sov_output_keys
+        cytora_sov_job_id >> wait_for_sov_job >> sov_output_keys
+
+    @task_group(group_id="renewal_flow")
+    def run_renewal_flow(main_output_key: dict[str], email_eml_file_cytora_id: str):
+        """
+        TaskGroup: renewal_flow
+
+        This task group includes the tasks for the cytora renewal flow.
+        Including extracting renewal metadata, checking renewal flow trigger condition,
+        retrieving slip files, starting the renewal schema job (with or without slip file),
+        waiting for job completion, and saving the processed output to blob storage.
+        """
+
+        @task
+        def extract_renewal_metadata(main_output_key: dict[str]):
+            """
+            Extract renewal metadata from the full Cytora main job output.
+
+            Args:
+               main_output_key (dict[str, str]): Dictionary containing blob storage keys
+               for main output files. Expected to include a "full" key.
+            """
+            try:
+                full_output_key = main_output_key.get("fullOutput")
+                if not full_output_key:
+                    raise KeyError("Missing required key 'full' in main_output_key")
+
+                logger.info(
+                    "Reading full main output from blob storage: %s", full_output_key
+                )
+                main_output_json_str = read_file_as_string(
+                    OUTPUT_BLOB_CONTAINER, full_output_key
+                )
+
+                try:
+                    main_output = json.loads(main_output_json_str)
+                except json.JSONDecodeError as e:
+                    logger.error("Invalid JSON in %s: %s", full_output_key, e)
+                    raise AirflowFailException("Invalid JSON in main output") from e
+
+                renewed_from_val = get_field_value(main_output, "renewed_from")
+                programme_ref, year_of_account = (
+                    parse_programme_ref_and_year_of_account(renewed_from_val)
+                )
+                is_renewal = check_is_renewal(main_output)
+
+                metadata = {
+                    "programme_ref": programme_ref,
+                    "year_of_account": year_of_account,
+                    "is_renewal": is_renewal,
+                }
+                logger.info("Extracted renewal metadata: %s", metadata)
+                return metadata
+
+            except Exception as e:
+                logger.error("Failed to extract renewal metadata: %s", e, exc_info=True)
+                raise AirflowFailException(
+                    f"extract_renewal_metadata failed: {e}"
+                ) from e
+
+        @task.short_circuit
+        def check_if_should_start_renewal_flow(metadata: dict):
+            if (
+                metadata["is_renewal"]
+                and metadata["programme_ref"]
+                and metadata["year_of_account"]
+            ):
+                return True
+            return False
+
+        @task
+        def fetch_slip_files(metadata: dict):
+            expired_file = find_expiring_slip(
+                programme_reference=metadata["programme_ref"],
+                year_of_account=metadata["year_of_account"],
+            )
+            logger.info("Extracted slip files: %s", expired_file)
+            if expired_file:
+                file_key = expired_file.get("file_key")
+                slip_name = expired_file.get("name")
+                return {
+                    "slip_blob_name": file_key,
+                    "slip_name": slip_name,
+                }
+            else:
+                return None
+
+        @task
+        def start_cytora_renewal_job(email_file_id: str, slip_info: dict | None) -> str:
+            """
+            Upload slip to Cytora, create files, and start a renewal schema job.
+            Includes logic for both with and without slip file.
+            Returns the renewal job_id.
+            """
+            cytora_renewal = CytoraHook(CYTORA_SCHEMA_RENEWAL)
+
+            if slip_info:
+                slip_blob_name = slip_info.get("slip_blob_name")
+                slip_name = slip_info.get("slip_name")
+                slip_media_type = guess_media_type(slip_name or "document.pdf")
+
+                status, slip_file_upload_id = upload_stream_to_cytora(
+                    blob_name=slip_blob_name,
+                    container_name=OUTPUT_BLOB_CONTAINER,
+                    cytora_instance=cytora_renewal,
+                    media_type=slip_media_type,
+                )
+                if status != 200:
+                    raise RuntimeError(f"Slip upload to Cytora failed: HTTP {status}")
+
+                slip_file_id = cytora_renewal.create_file(
+                    upload_id=slip_file_upload_id,
+                    file_name=CYTORA_RENEWAL_SLIP_FILE_NAME,
+                    media_type=slip_media_type,
+                )
+
+                renewal_job_id = start_cytora_job(
+                    cytora_instance=cytora_renewal,
+                    file_ids=[email_file_id, slip_file_id],
+                    file_names=[
+                        CYTORA_RENEWAL_FILE_NAME,
+                        CYTORA_RENEWAL_SLIP_FILE_NAME,
+                    ],
+                )
+                logger.info(
+                    "Started cytora renewal job with slip file: %s", renewal_job_id
+                )
+            else:
+                renewal_job_id = start_cytora_job(
+                    cytora_instance=cytora_renewal,
+                    file_ids=[email_file_id],
+                    file_names=[CYTORA_RENEWAL_FILE_NAME],
+                )
+                logger.info(
+                    "Started cytora renewal job with email file: %s", renewal_job_id
+                )
+
+            return renewal_job_id
+
+        @task
+        def save_cytora_renewal_output(job_id: str):
+            """
+            Retrieve Cytora output and saves the result to blob storage.
+
+            Args:
+                job_id (str): The Cytora job ID to fetch output for.
+            """
+            cytora_renewal = CytoraHook(CYTORA_SCHEMA_RENEWAL)
+            output = cytora_renewal.get_result_for_schema_job(job_id)
+
+            if not output:
+                raise AirflowFailException(
+                    f"No output returned for Cytora job {job_id}. Status may be errored or under human review."
+                )
+
+            try:
+                full_output_key = save_cytora_output_to_blob_storage(
+                    output=output, key_prefix=RENEWAL_FULL_OUTPUTS_PREFIX, job_id=job_id
+                )
+            except Exception as e:
+                raise AirflowException(
+                    f"Failed to save full output for job {job_id} to blob storage: {e}"
+                )
+
+            extracted_output = extract_renewal_outputs(output)
+            try:
+                extracted_output_key = save_cytora_output_to_blob_storage(
+                    output=extracted_output,
+                    key_prefix=RENEWAL_EXTRACTED_OUTPUTS_PREFIX,
+                    job_id=job_id,
+                )
+            except Exception as e:
+                raise AirflowException(
+                    f"Failed to save extracted output for job {job_id} to blob storage: {e}"
+                )
+
+            return full_output_key, extracted_output_key
+
+        metadata = extract_renewal_metadata(main_output_key=main_output_key)
+        should_start_renewal_flow = check_if_should_start_renewal_flow(
+            metadata=metadata
+        )
+        slip_info = fetch_slip_files(metadata=metadata)
+        cytora_renewal_job_id = start_cytora_renewal_job(
+            email_file_id=email_eml_file_cytora_id, slip_info=slip_info
+        )
+        renewal_output_keys = save_cytora_renewal_output(job_id=cytora_renewal_job_id)
+        wait_for_cytora_renewal_job = CytoraApiStatusSensorOperator(
+            task_id="wait_for_renewal_cytora_api_status",
+            cytora_schema=CYTORA_SCHEMA_RENEWAL,
+            job_id=cytora_renewal_job_id,
+        )
+
+        (
+            metadata
+            >> should_start_renewal_flow
+            >> slip_info
+            >> cytora_renewal_job_id
+            >> wait_for_cytora_renewal_job
+            >> renewal_output_keys
+        )
+
+    @task
+    def zip_to_dicts(
+        main_output_keys: list[str], cytora_ids: list[str]
+    ) -> list[dict[str, str]]:
+        return [
+            {
+                "main_output_key": main_output_key,
+                "email_eml_file_cytora_id": cytora_id,
+            }
+            for main_output_key, cytora_id in zip(main_output_keys, cytora_ids)
+        ]
 
     email_ids = get_email_ids()
 
     email_eml_file_task_instance = download_email_eml_file.expand(email_id=email_ids)
-    cytora_main_flow = run_main_flow(email_ids=email_ids)
-    cytora_sov_flow = run_sov_flow(email_ids=email_ids)
+    email_eml_file_cytora_ids = upload_email_eml_file_to_cytora.expand(
+        email_id=email_ids
+    )
+    cytora_main_flow_output_keys_list = run_main_flow.expand(
+        file_id=email_eml_file_cytora_ids
+    )
+    zipped_inputs = zip_to_dicts(
+        main_output_keys=cytora_main_flow_output_keys_list,
+        cytora_ids=email_eml_file_cytora_ids,
+    )
+    cytora_renewal_flow = run_renewal_flow.expand_kwargs(zipped_inputs)
+    cytora_sov_flow = run_sov_flow.expand(file_id=email_eml_file_cytora_ids)
 
-    (email_ids >> email_eml_file_task_instance >> [cytora_main_flow, cytora_sov_flow])
+    (
+        email_ids
+        >> email_eml_file_task_instance
+        >> email_eml_file_cytora_ids
+        >> [cytora_main_flow_output_keys_list, cytora_sov_flow]
+    )
+    cytora_main_flow_output_keys_list >> cytora_renewal_flow
 
     end = EmptyOperator(task_id="end", trigger_rule="none_failed_min_one_success")
-    [cytora_main_flow, cytora_sov_flow] >> end
+    [cytora_renewal_flow, cytora_sov_flow] >> end
 
 
 process_email_change_notifications()

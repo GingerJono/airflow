@@ -10,6 +10,7 @@ CYTORA_CONNECTION_ID = "cytora"
 CYTORA_AUTH_URL = "https://token.cytora.com/oauth/token"
 CYTORA_SCHEMA_MAIN = "ds:cfg:wr2pxXtxctBgFaZP"
 CYTORA_SCHEMA_SOV = "ds:cfg:LAXxpzGexUBzNxE4"
+CYTORA_SCHEMA_RENEWAL = "ds:cfg:bzPeK7jWwnuPhiR3"
 
 CYTORA_API_POLL_INTERVAL = 30
 CYTORA_API_TIMEOUT = 1800
@@ -107,12 +108,12 @@ class CytoraHook:
         logger.info("File registered with Cytora.")
         return data["id"]
 
-    def create_schema_job(self, file_id, job_name):
-        logger.info(f"Creating schema job for file_id: {file_id}")
+    def create_schema_job(self, file_ids, job_name):
+        logger.info(f"Creating schema job for file_ids: {file_ids}")
         url = f"{self.cytora_url_prefix}/digitize/workspaces/{self.workspace}/schemas/jobs"
         payload = {
             "schema_config_id": self.schema_config_id,
-            "file_ids": [file_id],
+            "file_ids": file_ids,
             "name": job_name,
         }
         headers = self._get_headers()
