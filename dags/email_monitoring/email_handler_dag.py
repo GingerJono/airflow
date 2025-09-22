@@ -1,7 +1,6 @@
 import json
 import logging
 import mimetypes
-import os
 import re
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -150,41 +149,9 @@ def extract_sov_from_flat_fields(fields: dict):
     return [row_map[i] for i in sorted(row_map.keys())]
 
 
-def fetch_expiring_slip_to_blob_storage() -> tuple[
-    str | None, bytes | None, str | None
-]:
-    sample_file_name = "Slip 2023.pdf"
-
-    dag_dir = os.path.dirname(__file__)
-    file_path = os.path.join(dag_dir, sample_file_name)
-
-    if not os.path.exists(file_path):
-        logger.warning("Test slip file not found at %s", file_path)
-        return None, None, None
-
-    with open(file_path, "rb") as f:
-        slip_bytes = f.read()
-
-    file_name = os.path.basename(file_path)
-
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S%f")[:-3]
-    blob_name = f"{timestamp}_{file_name}"
-
-    logger.info("Uploading test slip file to blob storage: %s", blob_name)
-
-    write_bytes_to_file(
-        container_name=MONITORING_BLOB_CONTAINER,
-        blob_name=blob_name,
-        bytes_data=slip_bytes,
-    )
-
-    logger.info("Slip file uploaded to blob storage: %s", blob_name)
-
-    slip_present = bool(slip_bytes)
-    return blob_name, slip_present, file_name
-
-
-def parse_programme_ref_and_yoa(renewed_from: str) -> tuple[str | None, int | None]:
+def parse_programme_ref_and_year_of_account(
+    renewed_from: str,
+) -> tuple[str | None, int | None]:
     if not renewed_from:
         return None, None
     token = renewed_from.split(";", 1)[0].strip()
@@ -388,8 +355,8 @@ def process_email_change_notifications():
                 )
 
             return {
-                "full": full_output_key,
-                "extracted": extracted_output_key,
+                "fullOutput": full_output_key,
+                "extractedOutput": extracted_output_key,
             }
 
         cytora_main_job_id = start_cytora_main_job(file_id=file_id)
@@ -513,7 +480,7 @@ def process_email_change_notifications():
                for main output files. Expected to include a "full" key.
             """
             try:
-                full_output_key = main_output_key.get("full")
+                full_output_key = main_output_key.get("fullOutput")
                 if not full_output_key:
                     raise KeyError("Missing required key 'full' in main_output_key")
 
@@ -531,12 +498,14 @@ def process_email_change_notifications():
                     raise AirflowFailException("Invalid JSON in main output") from e
 
                 renewed_from_val = get_field_value(main_output, "renewed_from")
-                programme_ref, yoa = parse_programme_ref_and_yoa(renewed_from_val)
+                programme_ref, year_of_account = (
+                    parse_programme_ref_and_year_of_account(renewed_from_val)
+                )
                 is_renewal = check_is_renewal(main_output)
 
                 metadata = {
                     "programme_ref": programme_ref,
-                    "yoa": yoa,
+                    "year_of_account": year_of_account,
                     "is_renewal": is_renewal,
                 }
                 logger.info("Extracted renewal metadata: %s", metadata)
@@ -550,7 +519,11 @@ def process_email_change_notifications():
 
         @task.short_circuit
         def check_if_should_start_renewal_flow(metadata: dict):
-            if metadata["is_renewal"] and metadata["programme_ref"] and metadata["yoa"]:
+            if (
+                metadata["is_renewal"]
+                and metadata["programme_ref"]
+                and metadata["year_of_account"]
+            ):
                 return True
             return False
 
@@ -558,18 +531,16 @@ def process_email_change_notifications():
         def fetch_slip_files(metadata: dict):
             expired_file = find_expiring_slip(
                 programme_reference=metadata["programme_ref"],
-                year_of_account=metadata["yoa"],
+                year_of_account=metadata["year_of_account"],
             )
             logger.info("Extracted slip files: %s", expired_file)
             if expired_file:
                 file_key = expired_file.get("file_key")
                 slip_name = expired_file.get("name")
-                return (
-                    {
-                        "slip_blob_name": file_key,
-                        "slip_name": slip_name,
-                    }
-                )
+                return {
+                    "slip_blob_name": file_key,
+                    "slip_name": slip_name,
+                }
             else:
                 return None
 
@@ -663,7 +634,6 @@ def process_email_change_notifications():
                 )
 
             return full_output_key, extracted_output_key
-
 
         metadata = extract_renewal_metadata(main_output_key=main_output_key)
         should_start_renewal_flow = check_if_should_start_renewal_flow(

@@ -128,17 +128,17 @@ def get_filtered_folder_items(
         year_of_account_val = normalise(fields.get("YearOfAccount", ""))
         doc_type_val = normalise(fields.get("DocumentType", ""))
 
-        yoa_match = (not year_of_account_val) or (
+        year_of_account_match = (not year_of_account_val) or (
             str(year_of_account_val) == str(yearOfAccount)
         )
         doc_type_match = (not doc_type_val) or (
             str(doc_type_val).lower() == str(document_type).lower()
         )
 
-        logging.info(f"Year of Account match: {yoa_match}")
+        logging.info(f"Year of Account match: {year_of_account_match}")
         logging.info(f"Document Type match: {doc_type_match}")
 
-        if yoa_match and doc_type_match:
+        if year_of_account_match and doc_type_match:
             filtered_folder_items.append(item)
 
     if not filtered_folder_items:
