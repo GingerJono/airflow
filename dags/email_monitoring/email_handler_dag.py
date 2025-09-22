@@ -563,23 +563,28 @@ def process_email_change_notifications():
             logger.info("Extracted slip files: %s", expired_file)
             if expired_file:
                 file_key = expired_file.get("file_key")
-                slip_is_present = True
                 slip_name = expired_file.get("name")
-                return file_key, slip_is_present, slip_name
+                return (
+                    {
+                        "slip_blob_name": file_key,
+                        "slip_name": slip_name,
+                    }
+                )
             else:
-                return None, None, None
+                return None
 
         @task
-        def start_cytora_renewal_job(email_file_id: str, slip_info: tuple) -> str:
+        def start_cytora_renewal_job(email_file_id: str, slip_info: dict | None) -> str:
             """
             Upload slip to Cytora, create files, and start a renewal schema job.
             Includes logic for both with and without slip file.
             Returns the renewal job_id.
             """
             cytora_renewal = CytoraHook(CYTORA_SCHEMA_RENEWAL)
-            slip_blob_name, slip_is_present, slip_name = slip_info
 
-            if slip_is_present:
+            if slip_info:
+                slip_blob_name = slip_info.get("slip_blob_name")
+                slip_name = slip_info.get("slip_name")
                 slip_media_type = guess_media_type(slip_name or "document.pdf")
 
                 status, slip_file_upload_id = upload_stream_to_cytora(
@@ -659,11 +664,6 @@ def process_email_change_notifications():
 
             return full_output_key, extracted_output_key
 
-        @task(trigger_rule="all_done")
-        def get_renewal_job_id(
-            job_id_with_slip: str | None, job_id_email_only: str | None
-        ) -> str:
-            return job_id_with_slip or job_id_email_only
 
         metadata = extract_renewal_metadata(main_output_key=main_output_key)
         should_start_renewal_flow = check_if_should_start_renewal_flow(
@@ -695,10 +695,10 @@ def process_email_change_notifications():
     ) -> list[dict[str, str]]:
         return [
             {
-                "main_output_key": mk,
-                "email_eml_file_cytora_id": cid,
+                "main_output_key": main_output_key,
+                "email_eml_file_cytora_id": cytora_id,
             }
-            for mk, cid in zip(main_output_keys, cytora_ids)
+            for main_output_key, cytora_id in zip(main_output_keys, cytora_ids)
         ]
 
     email_ids = get_email_ids()
