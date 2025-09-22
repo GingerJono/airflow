@@ -499,7 +499,7 @@ def process_email_change_notifications():
 
         This task group includes the tasks for the cytora renewal flow.
         Including extracting renewal metadata, checking renewal flow trigger condition,
-        retrieving slip files, starting the  schema job (with or without slip file),
+        retrieving slip files, starting the renewal schema job (with or without slip file),
         waiting for job completion, and saving the processed output to blob storage.
         """
 
@@ -572,7 +572,8 @@ def process_email_change_notifications():
         @task
         def start_cytora_renewal_job(email_file_id: str, slip_info: tuple) -> str:
             """
-            Upload slip to Cytora, create files, and start a renewal schema job (email + slip).
+            Upload slip to Cytora, create files, and start a renewal schema job.
+            Includes logic for both with and without slip file.
             Returns the renewal job_id.
             """
             cytora_renewal = CytoraHook(CYTORA_SCHEMA_RENEWAL)
