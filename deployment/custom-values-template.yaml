@@ -224,6 +224,26 @@ airflow:
       api_version:
       scopes:
 
+    - id: "sharepoint_microsoft_graph"
+      type: "msgraph"
+      description: "Microsoft Graph connection for interacting with Sharepoint."
+
+      login: "${MS_GRAPH_CLIENT_ID}"
+      password: "${MS_GRAPH_CLIENT_SECRET}"
+
+      extra: |
+        {
+          "tenant_id": "${TENANT_ID}",
+          "api_version": "v1.0",
+          "extra__msgraph__scopes": "[\"https://graph.microsoft.com/.default\"]"
+        }
+
+      client_id:
+      client_secret:
+      tenant_id:
+      api_version:
+      scopes:
+
     - id: "cytora"
       type: "generic"
       description: "Cytora connection"
@@ -286,6 +306,24 @@ airflow:
     MS_GRAPH_TENANT_ID:
       kind: "secret"
       name: "msgraph-connection-details"
+      key: "tenant_id"
+
+    ## extracts the value of client_id from `Secret/sharepoint-msgraph-connection-details`
+    SHAREPOINT_MS_GRAPH_CLIENT_ID:
+      kind: "secret"
+      name: "sharepoint-msgraph-connection-details"
+      key: "client_id"
+
+    ## extracts the value of client_secret from `Secret/sharepoint-msgraph-connection-details`
+    SHAREPOINT_MS_GRAPH_CLIENT_SECRET:
+      kind: "secret"
+      name: "sharepoint-msgraph-connection-details"
+      key: "client_secret"
+
+    ## extracts the value of tenant_id from `Secret/sharepoint-msgraph-connection-details`
+    SHAREPOINT_MS_GRAPH_TENANT_ID:
+      kind: "secret"
+      name: "sharepoint-msgraph-connection-details"
       key: "tenant_id"
 
     CYTORA_CLIENT_ID:
