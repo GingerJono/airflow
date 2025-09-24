@@ -148,7 +148,7 @@ class CytoraHook:
         status, output_status = self.get_schema_job_status(job_id)
 
         if status == "finished" and output_status == "confirmed":
-            logger.info("Job completed. Fetching output...")
+            logger.info(f"Job {job_id} completed. Fetching output...")
             output = self.get_schema_job_output(job_id)
             return output
 
@@ -159,9 +159,9 @@ class CytoraHook:
             # Optionally fetch and log any available partial output
             try:
                 output = self.get_schema_job_output(job_id)
-                logger.debug(f"Partial output: {json.dumps(output, indent=2)}")
+                logger.debug(f"Partial output for job {job_id}: {json.dumps(output, indent=2)}")
             except Exception as fetch_err:
-                logger.debug(f"No output could be retrieved: {fetch_err}")
+                logger.debug(f"No output could be retrieved for job {job_id}: {fetch_err}")
             return None
 
     def get_schema_config_list(self):
