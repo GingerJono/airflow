@@ -7,7 +7,7 @@ from airflow.models import Variable
 from airflow.providers.microsoft.azure.hooks.msgraph import (
     KiotaRequestAdapterHook as MSGraphHook,
 )
-from utilities.blob_storage_helper import OUTPUT_BLOB_CONTAINER, write_bytes_to_file
+from utilities.blob_storage_helper import MONITORING_BLOB_CONTAINER, write_bytes_to_file
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +153,7 @@ def get_latest_file(files):
     return files[0]
 
 
-def save_expired_file_to_blob_storage(file):
+def save_expired_file_to_blob_storage(file, blob_folder):
     download_url = file["@microsoft.graph.downloadUrl"]
     logging.info(f"Download URL: {download_url}")
 
@@ -161,9 +161,9 @@ def save_expired_file_to_blob_storage(file):
     response.raise_for_status()
     content_bytes = response.content
 
-    path = f"renewal/{file['name']}"
+    path = f"{blob_folder}/{file['name']}"
 
-    write_bytes_to_file(OUTPUT_BLOB_CONTAINER, path, content_bytes)
+    write_bytes_to_file(MONITORING_BLOB_CONTAINER, path, content_bytes)
 
     return path
 
@@ -172,6 +172,7 @@ def find_expiring_slip(
     programme_reference: str,
     year_of_account: int,
     document_type: str = "Slip",
+    blob_folder: str = "",
 ):
     site_id = get_sharepoint_site_id()
     drive_id = get_sharepoint_drive_id(site_id=site_id)
@@ -189,7 +190,7 @@ def find_expiring_slip(
     )
 
     latest_file = get_latest_file(filtered_folder_items)
-    file_key = save_expired_file_to_blob_storage(latest_file)
+    file_key = save_expired_file_to_blob_storage(latest_file, blob_folder)
 
     return {
         "drive_id": drive_id,
