@@ -2,16 +2,16 @@ import json
 import mimetypes
 from datetime import datetime
 
-from utilities.constants import (
-    DEFAULT_DATE_FORMAT,
-    TIMESTAMP_FORMAT_MILLISECONDS,
-)
+from helpers.cytora_helper import CytoraHook
 from utilities.blob_storage_helper import (
     MONITORING_BLOB_CONTAINER,
     read_file_as_bytes,
     write_string_to_file,
 )
-from helpers.cytora_helper import CytoraHook
+from utilities.constants import (
+    DEFAULT_DATE_FORMAT,
+    TIMESTAMP_FORMAT_MILLISECONDS,
+)
 
 
 def upload_stream_to_cytora(
@@ -45,6 +45,7 @@ def save_cytora_output_to_blob_storage(output: dict, key_prefix: str, job_id: st
     output_json = json.dumps(output, indent=2)
     write_string_to_file(MONITORING_BLOB_CONTAINER, key, output_json)
     return key
+
 
 def guess_media_type(filename: str) -> str:
     mt, _ = mimetypes.guess_type(filename or "")

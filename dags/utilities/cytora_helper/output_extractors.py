@@ -3,7 +3,6 @@ from collections import defaultdict
 
 from airflow.exceptions import AirflowException
 from helpers.cytora_mappings import CYTORA_OUTPUT_FIELD_MAP_MAIN
-
 from helpers.utils import get_field_value
 
 
