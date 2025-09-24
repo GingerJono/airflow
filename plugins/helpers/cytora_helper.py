@@ -159,9 +159,13 @@ class CytoraHook:
             # Optionally fetch and log any available partial output
             try:
                 output = self.get_schema_job_output(job_id)
-                logger.debug(f"Partial output for job {job_id}: {json.dumps(output, indent=2)}")
+                logger.debug(
+                    f"Partial output for job {job_id}: {json.dumps(output, indent=2)}"
+                )
             except Exception as fetch_err:
-                logger.debug(f"No output could be retrieved for job {job_id}: {fetch_err}")
+                logger.debug(
+                    f"No output could be retrieved for job {job_id}: {fetch_err}"
+                )
             return None
 
     def get_schema_config_list(self):
