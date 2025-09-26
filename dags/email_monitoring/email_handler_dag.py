@@ -100,8 +100,10 @@ def process_email_change_notifications():
         email_processing_jobs = []
         for email_id in email_ids:
             start_time = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-            response = requests.post(FUNCTION_APP_API + "/api/new-email-received",
-                                     json={"msGraphEmailId": email_id, "startTime": start_time})
+            response = requests.post(
+                FUNCTION_APP_API + "/api/new-email-received",
+                json={"msGraphEmailId": email_id, "startTime": start_time},
+            )
             response.raise_for_status()  # will raise an exception if not 2xx
             job_id = response.json()["id"]
 
@@ -221,14 +223,27 @@ def process_email_change_notifications():
                     file_ids=[email_eml_file_id],
                 )
             except Exception as e:
-                response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status",
-                                         json={"id": email_processing_job_id, "jobStatus": "Failed to start",
-                                               "cytoraJobType": "main"})
+                response = requests.post(
+                    FUNCTION_APP_API + "/api/cytora-job-status",
+                    json={
+                        "id": email_processing_job_id,
+                        "jobStatus": "Failed to start",
+                        "cytoraJobType": "main",
+                    },
+                )
                 response.raise_for_status()  # will raise an exception if not 2xx
                 raise AirflowException(f"Failed to start Cytora main job: {e}")
 
             logger.info(f"Started cytora main job with id {main_job_id}")
-            response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status", json={"id": email_processing_job_id, "cytorajobID": main_job_id, "jobStatus": "In Progress", "cytoraJobType": "main"})
+            response = requests.post(
+                FUNCTION_APP_API + "/api/cytora-job-status",
+                json={
+                    "id": email_processing_job_id,
+                    "cytorajobID": main_job_id,
+                    "jobStatus": "In Progress",
+                    "cytoraJobType": "main",
+                },
+            )
             response.raise_for_status()  # will raise an exception if not 2xx
 
             email_processing_job["main_job_id"] = main_job_id
@@ -250,11 +265,15 @@ def process_email_change_notifications():
             output = cytora_main.get_result_for_schema_job(job_id)
 
             if not output:
-                response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status",
-                                         json={"id": email_processing_job_id,
-                                               "cytorajobID": job_id,
-                                               "jobStatus": "Failed - Status might be errored or under human review",
-                                               "cytoraJobType": "main"})
+                response = requests.post(
+                    FUNCTION_APP_API + "/api/cytora-job-status",
+                    json={
+                        "id": email_processing_job_id,
+                        "cytorajobID": job_id,
+                        "jobStatus": "Failed - Status might be errored or under human review",
+                        "cytoraJobType": "main",
+                    },
+                )
                 response.raise_for_status()  # will raise an exception if not 2xx
 
                 raise AirflowFailException(
@@ -262,7 +281,9 @@ def process_email_change_notifications():
                 )
             logger.info(f"Retrieved output for Cytora job {job_id}")
 
-            logger.info(f"Saving full output for main flow job to blob storage: {job_id}")
+            logger.info(
+                f"Saving full output for main flow job to blob storage: {job_id}"
+            )
             try:
                 full_output_key = save_cytora_output_to_blob_storage(
                     output=output,
@@ -270,10 +291,15 @@ def process_email_change_notifications():
                     job_id=job_id,
                 )
             except Exception as e:
-                response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status",
-                                         json={"id": email_processing_job_id,
-                                               "cytorajobID": job_id, "jobStatus": "Failed to save full output",
-                                               "cytoraJobType": "main"})
+                response = requests.post(
+                    FUNCTION_APP_API + "/api/cytora-job-status",
+                    json={
+                        "id": email_processing_job_id,
+                        "cytorajobID": job_id,
+                        "jobStatus": "Failed to save full output",
+                        "cytoraJobType": "main",
+                    },
+                )
                 response.raise_for_status()  # will raise an exception if not 2xx
 
                 raise AirflowException(
@@ -284,12 +310,19 @@ def process_email_change_notifications():
             logger.info(f"Extracting trimmed output for main flow job: {job_id}")
             extracted_output = extract_main_outputs(output)
 
-            logger.info(f"Saving main job extracted output to DB: {email_processing_job_id}")
-            response = requests.post(FUNCTION_APP_API + "/api/main-job-output", json={"id": email_processing_job_id, "output": extracted_output})
+            logger.info(
+                f"Saving main job extracted output to DB: {email_processing_job_id}"
+            )
+            response = requests.post(
+                FUNCTION_APP_API + "/api/main-job-output",
+                json={"id": email_processing_job_id, "output": extracted_output},
+            )
             response.raise_for_status()  # will raise an exception if not 2xx
             logger.info(f"Extracted output for main job {job_id} saved to DB.")
 
-            logger.info(f"Saving extracted output for main flow job to blob storage: {job_id}")
+            logger.info(
+                f"Saving extracted output for main flow job to blob storage: {job_id}"
+            )
             try:
                 extracted_output_key = save_cytora_output_to_blob_storage(
                     output=extracted_output,
@@ -297,17 +330,30 @@ def process_email_change_notifications():
                     job_id=job_id,
                 )
             except Exception as e:
-                response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status",
-                                         json={"id": email_processing_job_id,
-                                               "cytorajobID": job_id, "jobStatus": "Failed to save extracted output to blob storage",
-                                               "cytoraJobType": "main"})
+                response = requests.post(
+                    FUNCTION_APP_API + "/api/cytora-job-status",
+                    json={
+                        "id": email_processing_job_id,
+                        "cytorajobID": job_id,
+                        "jobStatus": "Failed to save extracted output to blob storage",
+                        "cytoraJobType": "main",
+                    },
+                )
                 response.raise_for_status()  # will raise an exception if not 2xx
 
                 raise AirflowException(
                     f"Failed to save extracted output for job {job_id} to blob storage: {e}"
                 )
 
-            response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status", json={"id": email_processing_job_id, "cytorajobID": job_id, "jobStatus": "Completed", "cytoraJobType": "main"})
+            response = requests.post(
+                FUNCTION_APP_API + "/api/cytora-job-status",
+                json={
+                    "id": email_processing_job_id,
+                    "cytorajobID": job_id,
+                    "jobStatus": "Completed",
+                    "cytoraJobType": "main",
+                },
+            )
             response.raise_for_status()  # will raise an exception if not 2xx
             logger.info(f"Extracted output for job {job_id} saved to blob storage.")
 
@@ -361,13 +407,26 @@ def process_email_change_notifications():
                     file_ids=[file_id],
                 )
             except Exception as e:
-                response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status",
-                                         json={"id": email_processing_job_id, "jobStatus": "Failed to start",
-                                               "cytoraJobType": "sov"})
+                response = requests.post(
+                    FUNCTION_APP_API + "/api/cytora-job-status",
+                    json={
+                        "id": email_processing_job_id,
+                        "jobStatus": "Failed to start",
+                        "cytoraJobType": "sov",
+                    },
+                )
                 response.raise_for_status()  # will raise an exception if not 2xx
                 raise AirflowException(f"Failed to start Cytora sov job: {e}")
 
-            response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status", json={"id": email_processing_job_id, "cytoraJobID": sov_job_id, "jobStatus": "In Progress", "cytoraJobType": "sov"})
+            response = requests.post(
+                FUNCTION_APP_API + "/api/cytora-job-status",
+                json={
+                    "id": email_processing_job_id,
+                    "cytoraJobID": sov_job_id,
+                    "jobStatus": "In Progress",
+                    "cytoraJobType": "sov",
+                },
+            )
             response.raise_for_status()  # will raise an exception if not 2xx
             logger.info(f"Started cytora sov job with id {sov_job_id}")
 
@@ -390,18 +449,24 @@ def process_email_change_notifications():
             output = cytora_sov.get_result_for_schema_job(job_id)
 
             if not output:
-                response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status",
-                                         json={"id": email_processing_job_id,
-                                               "cytoraJobID": job_id,
-                                               "jobStatus": "Failed - Status might be errored or under human review",
-                                               "cytoraJobType": "sov"})
+                response = requests.post(
+                    FUNCTION_APP_API + "/api/cytora-job-status",
+                    json={
+                        "id": email_processing_job_id,
+                        "cytoraJobID": job_id,
+                        "jobStatus": "Failed - Status might be errored or under human review",
+                        "cytoraJobType": "sov",
+                    },
+                )
                 response.raise_for_status()  # will raise an exception if not 2xx
                 raise AirflowFailException(
                     f"No output returned for Cytora job {job_id}. Status may be errored or under human review."
                 )
             logger.info(f"Retrieved output for Cytora job {job_id}")
 
-            logger.info(f"Saving full output for sov flow job to blob storage: {job_id}")
+            logger.info(
+                f"Saving full output for sov flow job to blob storage: {job_id}"
+            )
             try:
                 full_output_key = save_cytora_output_to_blob_storage(
                     output=output,
@@ -409,7 +474,15 @@ def process_email_change_notifications():
                     job_id=job_id,
                 )
             except Exception as e:
-                response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status", json={"id": email_processing_job_id, "cytoraJobID": job_id, "jobStatus": "Failed to save full output", "cytoraJobType": "sov"})
+                response = requests.post(
+                    FUNCTION_APP_API + "/api/cytora-job-status",
+                    json={
+                        "id": email_processing_job_id,
+                        "cytoraJobID": job_id,
+                        "jobStatus": "Failed to save full output",
+                        "cytoraJobType": "sov",
+                    },
+                )
                 response.raise_for_status()  # will raise an exception if not 2xx
                 raise AirflowException(
                     f"Failed to save full output for job {job_id} to blob storage: {e}"
@@ -424,16 +497,31 @@ def process_email_change_notifications():
             }
 
             if not extracted_output_dict:
-                response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status", json={"id": email_processing_job_id, "cytoraJobID": job_id, "jobStatus": "Completed - no SOV fields found", "cytoraJobType": "sov"})
+                response = requests.post(
+                    FUNCTION_APP_API + "/api/cytora-job-status",
+                    json={
+                        "id": email_processing_job_id,
+                        "cytoraJobID": job_id,
+                        "jobStatus": "Completed - no SOV fields found",
+                        "cytoraJobType": "sov",
+                    },
+                )
                 response.raise_for_status()  # will raise an exception if not 2xx
                 return full_output_key, None
 
-            logger.info(f"Saving sov job extracted output to DB: {email_processing_job_id}")
-            response = requests.post(FUNCTION_APP_API + "/api/sov-job-output", json={"id": email_processing_job_id, "output": extracted_output_dict})
+            logger.info(
+                f"Saving sov job extracted output to DB: {email_processing_job_id}"
+            )
+            response = requests.post(
+                FUNCTION_APP_API + "/api/sov-job-output",
+                json={"id": email_processing_job_id, "output": extracted_output_dict},
+            )
             response.raise_for_status()  # will raise an exception if not 2xx
             logger.info(f"Extracted output for sov job {job_id} saved to DB.")
 
-            logger.info(f"Saving extracted output for sov flow job to blob storage: {job_id}")
+            logger.info(
+                f"Saving extracted output for sov flow job to blob storage: {job_id}"
+            )
             try:
                 extracted_output_key = save_cytora_output_to_blob_storage(
                     output=extracted_output_dict,
@@ -441,17 +529,30 @@ def process_email_change_notifications():
                     job_id=job_id,
                 )
             except Exception as e:
-                response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status",
-                                         json={"id": email_processing_job_id,
-                                               "cytorajobID": job_id, "jobStatus": "Failed to save extracted output to blob storage",
-                                               "cytoraJobType": "sov"})
+                response = requests.post(
+                    FUNCTION_APP_API + "/api/cytora-job-status",
+                    json={
+                        "id": email_processing_job_id,
+                        "cytorajobID": job_id,
+                        "jobStatus": "Failed to save extracted output to blob storage",
+                        "cytoraJobType": "sov",
+                    },
+                )
                 response.raise_for_status()
 
                 raise AirflowException(
                     f"Failed to save extracted output for job {job_id} to blob storage: {e}"
                 )
             logger.info(f"Extracted output for job {job_id} saved to blob storage.")
-            response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status", json={"id": email_processing_job_id, "cytoraJobID": job_id, "jobStatus": "Completed", "cytoraJobType": "sov"})
+            response = requests.post(
+                FUNCTION_APP_API + "/api/cytora-job-status",
+                json={
+                    "id": email_processing_job_id,
+                    "cytoraJobID": job_id,
+                    "jobStatus": "Completed",
+                    "cytoraJobType": "sov",
+                },
+            )
             response.raise_for_status()  # will raise an exception if not 2xx
 
             return full_output_key, extracted_output_key
@@ -615,9 +716,14 @@ def process_email_change_notifications():
                         ],
                     )
                 except Exception as e:
-                    response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status",
-                                             json={"id": email_processing_job_id, "jobStatus": "Failed to start",
-                                                   "cytoraJobType": "renewal"})
+                    response = requests.post(
+                        FUNCTION_APP_API + "/api/cytora-job-status",
+                        json={
+                            "id": email_processing_job_id,
+                            "jobStatus": "Failed to start",
+                            "cytoraJobType": "renewal",
+                        },
+                    )
                     response.raise_for_status()  # will raise an exception if not 2xx
                     raise AirflowException(
                         f"Failed to start Cytora renewal job with slip: {e}"
@@ -634,9 +740,14 @@ def process_email_change_notifications():
                         file_names=[CYTORA_RENEWAL_FILE_NAME],
                     )
                 except Exception as e:
-                    response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status",
-                                             json={"id": email_processing_job_id, "jobStatus": "Failed to start",
-                                                   "cytoraJobType": "renewal"})
+                    response = requests.post(
+                        FUNCTION_APP_API + "/api/cytora-job-status",
+                        json={
+                            "id": email_processing_job_id,
+                            "jobStatus": "Failed to start",
+                            "cytoraJobType": "renewal",
+                        },
+                    )
                     response.raise_for_status()  # will raise an exception if not 2xx
                     raise AirflowException(
                         f"Failed to start Cytora renewal job without slip: {e}"
@@ -646,10 +757,15 @@ def process_email_change_notifications():
                     renewal_job_id,
                 )
 
-            response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status",
-                                     json={"id": email_processing_job_id,
-                                           "cytoraJobID": renewal_job_id, "jobStatus": "In Progress",
-                                           "cytoraJobType": "renewal"})
+            response = requests.post(
+                FUNCTION_APP_API + "/api/cytora-job-status",
+                json={
+                    "id": email_processing_job_id,
+                    "cytoraJobID": renewal_job_id,
+                    "jobStatus": "In Progress",
+                    "cytoraJobType": "renewal",
+                },
+            )
             response.raise_for_status()  # will raise an exception if not 2xx
             email_processing_job["renewal_job_id"] = renewal_job_id
             return email_processing_job
@@ -668,20 +784,38 @@ def process_email_change_notifications():
             output = cytora_renewal.get_result_for_schema_job(job_id)
 
             if not output:
-                response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status", json={"id": email_processing_job_id, "cytoraJobID": job_id, "jobStatus": "Failed - Status may be errored or under human review", "cytoraJobType": "renewal"})
+                response = requests.post(
+                    FUNCTION_APP_API + "/api/cytora-job-status",
+                    json={
+                        "id": email_processing_job_id,
+                        "cytoraJobID": job_id,
+                        "jobStatus": "Failed - Status may be errored or under human review",
+                        "cytoraJobType": "renewal",
+                    },
+                )
                 response.raise_for_status()  # will raise an exception if not 2xx
                 raise AirflowFailException(
                     f"No output returned for Cytora job {job_id}. Status may be errored or under human review."
                 )
             logger.info(f"Retrieved output for Cytora job {job_id}")
 
-            logger.info(f"Saving full output for renewal flow job to blob storage: {job_id}")
+            logger.info(
+                f"Saving full output for renewal flow job to blob storage: {job_id}"
+            )
             try:
                 full_output_key = save_cytora_output_to_blob_storage(
                     output=output, key_prefix=RENEWAL_FULL_OUTPUTS_PREFIX, job_id=job_id
                 )
             except Exception as e:
-                response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status", json={"id": email_processing_job_id, "cytoraJobID": job_id, "jobStatus": "Failed to save full output to blob storage", "cytoraJobType": "renewal"})
+                response = requests.post(
+                    FUNCTION_APP_API + "/api/cytora-job-status",
+                    json={
+                        "id": email_processing_job_id,
+                        "cytoraJobID": job_id,
+                        "jobStatus": "Failed to save full output to blob storage",
+                        "cytoraJobType": "renewal",
+                    },
+                )
                 response.raise_for_status()  # will raise an exception if not 2xx
                 raise AirflowException(
                     f"Failed to save full output for job {job_id} to blob storage: {e}"
@@ -691,8 +825,17 @@ def process_email_change_notifications():
             logger.info(f"Extracting trimmed output for renewal flow job: {job_id}")
             extracted_output = extract_renewal_outputs(output)
 
-            logger.info(f"Saving renewal job extracted output to DB: {email_processing_job_id}")
-            response = requests.post(FUNCTION_APP_API + "/api/renewal-job-output", json={"id": email_processing_job_id, "cytoraJobID": job_id, "output": extracted_output})
+            logger.info(
+                f"Saving renewal job extracted output to DB: {email_processing_job_id}"
+            )
+            response = requests.post(
+                FUNCTION_APP_API + "/api/renewal-job-output",
+                json={
+                    "id": email_processing_job_id,
+                    "cytoraJobID": job_id,
+                    "output": extracted_output,
+                },
+            )
             response.raise_for_status()  # will raise an exception if not 2xx
             logger.info(f"Extracted output for renewal job {job_id} saved to DB.")
 
@@ -704,14 +847,30 @@ def process_email_change_notifications():
                     job_id=job_id,
                 )
             except Exception as e:
-                response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status", json={"id": email_processing_job_id, "cytoraJobID": job_id, "jobStatus": "Failed to save extracted output to blob storage", "cytoraJobType": "renewal"})
+                response = requests.post(
+                    FUNCTION_APP_API + "/api/cytora-job-status",
+                    json={
+                        "id": email_processing_job_id,
+                        "cytoraJobID": job_id,
+                        "jobStatus": "Failed to save extracted output to blob storage",
+                        "cytoraJobType": "renewal",
+                    },
+                )
                 response.raise_for_status()  # will raise an exception if not 2xx
                 raise AirflowException(
                     f"Failed to save extracted output for job {job_id} to blob storage: {e}"
                 )
             logger.info(f"Extracted output for job {job_id} saved to blob storage")
 
-            response = requests.post(FUNCTION_APP_API + "/api/cytora-job-status", json={"id": email_processing_job_id, "cytoraJobID": job_id, "jobStatus": "Completed", "cytoraJobType": "renewal"})
+            response = requests.post(
+                FUNCTION_APP_API + "/api/cytora-job-status",
+                json={
+                    "id": email_processing_job_id,
+                    "cytoraJobID": job_id,
+                    "jobStatus": "Completed",
+                    "cytoraJobType": "renewal",
+                },
+            )
             response.raise_for_status()  # will raise an exception if not 2xx
 
             return full_output_key, extracted_output_key
