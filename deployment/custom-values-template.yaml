@@ -369,6 +369,12 @@ airflow:
       value: "${AZUREAI_API_KEY}"
     - key: "azureai_endpoint"
       value: "${AZUREAI_ENDPOINT}"
+    - key: "sharepoint_site_hostname"
+      value: "${SHAREPOINT_SITE_HOSTNAME}"
+    - key: "sharepoint_site_path"
+      value: "${SHAREPOINT_SITE_PATH}"
+    - key: "sharepoint_library_name"
+      value: "${SHAREPOINT_LIBRARY_NAME}"
       
   variablesTemplates:
   
@@ -406,6 +412,21 @@ airflow:
       kind: configmap
       name: azureai-connection-details
       key: endpoint
+
+    SHAREPOINT_SITE_HOSTNAME:
+      kind: configmap
+      name: sharepoint-connection-configuration
+      key: sharepoint_site_hostname
+
+    SHAREPOINT_SITE_PATH:
+      kind: configmap
+      name: sharepoint-connection-configuration
+      key: sharepoint_site_path
+
+    SHAREPOINT_LIBRARY_NAME:
+      kind: configmap
+      name: sharepoint-connection-configuration
+      key: sharepoint_library_name
 
   ## a list airflow pools to create
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-pools.md
