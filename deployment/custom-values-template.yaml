@@ -228,8 +228,8 @@ airflow:
       type: "msgraph"
       description: "Microsoft Graph connection for interacting with Sharepoint."
 
-      login: "${MS_GRAPH_CLIENT_ID}"
-      password: "${MS_GRAPH_CLIENT_SECRET}"
+      login: "${SHAREPOINT_MS_GRAPH_CLIENT_ID}"
+      password: "${SHAREPOINT_MS_GRAPH_CLIENT_SECRET}"
 
       extra: |
         {
