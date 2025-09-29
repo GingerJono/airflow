@@ -8,7 +8,6 @@ from helpers.utils import safe_parse_date, safe_stringify
 #   the raw Cytora value before storing.
 
 CYTORA_OUTPUT_FIELD_MAP_MAIN = {
-    "FileName": (None, safe_stringify),
     "EmailSubject": ("email_subject", safe_stringify),
     "EmailFrom": ("email_from", safe_stringify),
     "EmailTo": ("email_to", safe_stringify),
