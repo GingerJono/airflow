@@ -24,7 +24,7 @@ def set_cytora_job_status(
     }
 
     if cytora_job_id:
-        payload["cytoraJobId"] = cytora_job_id
+        payload["cytoraJobID"] = cytora_job_id
 
     response = requests.post(base_url + "/api/cytora-job-status", json=payload)
     response.raise_for_status()
@@ -39,4 +39,16 @@ def save_cytora_output_to_db(
         json={"id": email_processing_job_id, "output": extracted_output},
     )
     response.raise_for_status()  # will raise an exception if not 2xx
+
+
+def end_email_processing_job_in_db(base_url: str, email_processing_job_id: str, end_time: str, overall_job_status: str):
+    response = requests.post(
+        base_url + "/api/email-processing-finished",
+        json={
+            "id": email_processing_job_id,
+            "endTime": end_time,
+            "overallJobStatus": overall_job_status,
+        },
+    )
+    response.raise_for_status()
 

@@ -62,6 +62,11 @@ from utilities.database_helper import (
     set_cytora_job_status, save_cytora_output_to_db,
 )
 
+from utilities.utils import bytes_to_megabytes
+
+from utilities.constants import TIMESTAMP_FORMAT_READABLE_MICROSECONDS
+from utilities.database_helper import end_email_processing_job_in_db
+
 NUM_RETRIES = 2
 RETRY_DELAY_MINS = 3
 
@@ -104,7 +109,7 @@ def process_email_change_notifications():
 
         email_processing_jobs = []
         for email_id in email_ids:
-            start_time = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+            start_time = datetime.now(UTC).strftime(TIMESTAMP_FORMAT_READABLE_MICROSECONDS)[:-3]
             response = create_email_processing_job(
                 base_url=FUNCTION_APP_API, email_id=email_id, start_time=start_time
             )
@@ -118,6 +123,7 @@ def process_email_change_notifications():
                 "sov_job_id": None,
                 "renewal_job_id": None,
                 "email_eml_file_id": None,
+                "email_eml_file_size": None,
                 "main_output_key": None,
                 "renewal_metadata": None,
                 "slip_info": None,
@@ -140,6 +146,7 @@ def process_email_change_notifications():
 
         mailbox = Variable.get("email_monitoring_mailbox")
         result = get_eml_file_from_email_id(email_id=email_id, mailbox=mailbox)
+        email_processing_job["email_eml_file_size"] = bytes_to_megabytes(len(result))
         if not result:
             raise AirflowException(f"No content retrieved for email {email_id}")
 
@@ -300,6 +307,7 @@ def process_email_change_notifications():
 
             logger.info(f"Extracting trimmed output for main flow job: {job_id}")
             extracted_output = extract_main_outputs(output)
+            extracted_output["EmailFileSizeInMB"] = email_processing_job["email_eml_file_size"]
 
             logger.info(
                 f"Saving main job extracted output to DB: {email_processing_job_id}"
@@ -847,6 +855,16 @@ def process_email_change_notifications():
         # Keeping this ensures jobs are properly handed off to the next flow.
         return email_processing_jobs
 
+    @task(trigger_rule="all_done")
+    def end_email_processing_job(email_processing_job: dict):
+        end_email_processing_job_in_db(
+            base_url=FUNCTION_APP_API,
+            overall_job_status="Completed",
+            end_time=datetime.now(UTC).strftime(TIMESTAMP_FORMAT_READABLE_MICROSECONDS)[:-3],
+            email_processing_job_id=email_processing_job["id"],
+        )
+        return email_processing_job
+
     init_email_processing_jobs = init_email_processing_jobs()
 
     email_processing_jobs = download_email_eml_file.expand(
@@ -862,8 +880,12 @@ def process_email_change_notifications():
     )
     cytora_sov_flow = run_sov_flow.expand(email_processing_job=uploaded_jobs)
 
+    ended_jobs = end_email_processing_job.expand(
+        email_processing_job=uploaded_jobs
+    )
+    [cytora_renewal_flow, cytora_sov_flow] >> ended_jobs
     end = EmptyOperator(task_id="end", trigger_rule="none_failed_min_one_success")
-    [cytora_renewal_flow, cytora_sov_flow] >> end
+    ended_jobs >> end
 
 
 process_email_change_notifications()
