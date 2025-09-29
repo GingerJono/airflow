@@ -32,7 +32,10 @@ def set_cytora_job_status(
 
 
 def save_cytora_output_to_db(
-    base_url: str, endpoint: str, email_processing_job_id: str, extracted_output: str | dict[str, str]
+    base_url: str,
+    endpoint: str,
+    email_processing_job_id: str,
+    extracted_output: str | dict[str, str],
 ):
     response = requests.post(
         f"{base_url}{endpoint}",
@@ -41,7 +44,9 @@ def save_cytora_output_to_db(
     response.raise_for_status()  # will raise an exception if not 2xx
 
 
-def end_email_processing_job_in_db(base_url: str, email_processing_job_id: str, end_time: str, overall_job_status: str):
+def end_email_processing_job_in_db(
+    base_url: str, email_processing_job_id: str, end_time: str, overall_job_status: str
+):
     response = requests.post(
         base_url + "/api/email-processing-finished",
         json={
@@ -51,4 +56,3 @@ def end_email_processing_job_in_db(base_url: str, email_processing_job_id: str, 
         },
     )
     response.raise_for_status()
-

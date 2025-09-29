@@ -2,7 +2,6 @@ import json
 import logging
 from datetime import UTC, datetime, timedelta
 
-import requests
 from airflow.decorators import dag, task, task_group
 from airflow.exceptions import AirflowException, AirflowFailException
 from airflow.models import Variable
@@ -36,6 +35,7 @@ from utilities.constants import (
     RENEWAL_FULL_OUTPUTS_PREFIX,
     SOV_EXTRACTED_OUTPUTS_PREFIX,
     SOV_FULL_OUTPUTS_PREFIX,
+    TIMESTAMP_FORMAT_READABLE_MICROSECONDS,
 )
 from utilities.cytora_helper.client import (
     guess_media_type,
@@ -52,20 +52,17 @@ from utilities.cytora_helper.parsers import (
     check_is_renewal,
     parse_programme_ref_and_year_of_account,
 )
+from utilities.database_helper import (
+    create_email_processing_job,
+    end_email_processing_job_in_db,
+    save_cytora_output_to_db,
+    set_cytora_job_status,
+)
 from utilities.msgraph_helper import (
     get_eml_file_from_email_id,
 )
 from utilities.sharepoint_helper import find_expiring_slip
-
-from utilities.database_helper import (
-    create_email_processing_job,
-    set_cytora_job_status, save_cytora_output_to_db,
-)
-
 from utilities.utils import bytes_to_megabytes
-
-from utilities.constants import TIMESTAMP_FORMAT_READABLE_MICROSECONDS
-from utilities.database_helper import end_email_processing_job_in_db
 
 NUM_RETRIES = 2
 RETRY_DELAY_MINS = 3
@@ -109,7 +106,9 @@ def process_email_change_notifications():
 
         email_processing_jobs = []
         for email_id in email_ids:
-            start_time = datetime.now(UTC).strftime(TIMESTAMP_FORMAT_READABLE_MICROSECONDS)[:-3]
+            start_time = datetime.now(UTC).strftime(
+                TIMESTAMP_FORMAT_READABLE_MICROSECONDS
+            )[:-3]
             response = create_email_processing_job(
                 base_url=FUNCTION_APP_API, email_id=email_id, start_time=start_time
             )
@@ -307,7 +306,9 @@ def process_email_change_notifications():
 
             logger.info(f"Extracting trimmed output for main flow job: {job_id}")
             extracted_output = extract_main_outputs(output)
-            extracted_output["EmailFileSizeInMB"] = email_processing_job["email_eml_file_size"]
+            extracted_output["EmailFileSizeInMB"] = email_processing_job[
+                "email_eml_file_size"
+            ]
 
             logger.info(
                 f"Saving main job extracted output to DB: {email_processing_job_id}"
@@ -860,7 +861,9 @@ def process_email_change_notifications():
         end_email_processing_job_in_db(
             base_url=FUNCTION_APP_API,
             overall_job_status="Completed",
-            end_time=datetime.now(UTC).strftime(TIMESTAMP_FORMAT_READABLE_MICROSECONDS)[:-3],
+            end_time=datetime.now(UTC).strftime(TIMESTAMP_FORMAT_READABLE_MICROSECONDS)[
+                :-3
+            ],
             email_processing_job_id=email_processing_job["id"],
         )
         return email_processing_job
@@ -880,9 +883,7 @@ def process_email_change_notifications():
     )
     cytora_sov_flow = run_sov_flow.expand(email_processing_job=uploaded_jobs)
 
-    ended_jobs = end_email_processing_job.expand(
-        email_processing_job=uploaded_jobs
-    )
+    ended_jobs = end_email_processing_job.expand(email_processing_job=uploaded_jobs)
     [cytora_renewal_flow, cytora_sov_flow] >> ended_jobs
     end = EmptyOperator(task_id="end", trigger_rule="none_failed_min_one_success")
     ended_jobs >> end
