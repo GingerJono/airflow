@@ -10,7 +10,7 @@ from utilities.blob_storage_helper import (
 )
 from utilities.constants import (
     DEFAULT_DATE_FORMAT,
-    TIMESTAMP_FORMAT_MILLISECONDS,
+    TIMESTAMP_FORMAT_COMPACT_MICROSECONDS,
 )
 
 
@@ -39,7 +39,7 @@ def start_cytora_job(
 
 
 def save_cytora_output_to_blob_storage(output: dict, key_prefix: str, job_id: str):
-    ts = datetime.now().strftime(TIMESTAMP_FORMAT_MILLISECONDS)[:-3]
+    ts = datetime.now().strftime(TIMESTAMP_FORMAT_COMPACT_MICROSECONDS)[:-3]
     output["TimeProcessed"] = ts
     key = f"{key_prefix}_{ts}_{job_id}.json"
     output_json = json.dumps(output, indent=2)

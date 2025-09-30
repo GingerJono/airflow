@@ -8,6 +8,11 @@ from helpers.utils import safe_parse_date, safe_stringify
 #   the raw Cytora value before storing.
 
 CYTORA_OUTPUT_FIELD_MAP_MAIN = {
+    "EmailSubject": ("email_subject", safe_stringify),
+    "EmailFrom": ("email_from", safe_stringify),
+    "EmailTo": ("email_to", safe_stringify),
+    "EmailDataSent": ("email_timestamp", safe_stringify),
+    "EmailFileSizeInMB": (None, safe_stringify),
     "OutputInsuredName": ("insured_name", safe_stringify),
     "OutputInsuredDomicile": ("insured_domicile", safe_stringify),
     "OutputInsuredState": ("insured_state", safe_stringify),
