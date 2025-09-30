@@ -375,6 +375,8 @@ airflow:
       value: "${SHAREPOINT_SITE_PATH}"
     - key: "sharepoint_library_name"
       value: "${SHAREPOINT_LIBRARY_NAME}"
+    - key: "function_app_api"
+      value: "${FUNCTION_APP_API}"
       
   variablesTemplates:
   
@@ -427,6 +429,11 @@ airflow:
       kind: configmap
       name: sharepoint-connection-configuration
       key: sharepoint_library_name
+
+    FUNCTION_APP_API:
+      kind: configmap
+      name: functionapp-connection-details
+      key: base_url
 
   ## a list airflow pools to create
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-pools.md
