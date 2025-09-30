@@ -67,7 +67,7 @@ from utilities.utils import bytes_to_megabytes
 NUM_RETRIES = 2
 RETRY_DELAY_MINS = 3
 
-FUNCTION_APP_API = "http://host.docker.internal:7071"
+FUNCTION_APP_API = Variable.get("function_app_api")
 
 logger = logging.getLogger(__name__)
 
