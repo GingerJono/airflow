@@ -211,6 +211,8 @@ Variables are set in the UI at Admin > Variables, and are set in custom-values.y
 | email_monitoring_client_state                    | Value from key vault secret `email-monitoring-client-secret`                                                                               | Client secret for service principal used to authenticate with Microsoft Graph for email subscription.                                                                                                                       |
 | email_monitoring_mailbox                         | `autosubs.dev@daleuw.com`                                                                                                                  | The mailbox which is being monitored for submissions.                                                                                                                                                                       |
 | email_monitoring_recipients                      | `["autosubs.dev@daleuw.com", "group-dale-integrationlayer-internal@softwire.com"]`                                                         | The recipients that the LLM summary email should be sent to. Must be formatted as a list, and should include the mailbox that is being monitored. In non-production environments should include the development team email. |
+| function_app_api | For local dev the value should be: `http://host.docker.internal:7071` | The URL for the function app |
+| function_app_api_key | For local dev the value should be: `test` | The App Key of the function app. In the deployed env - this can be found in the Function app and it needs to match with the function_app_api_key in Key Vault. |
 
 ### Connections
 

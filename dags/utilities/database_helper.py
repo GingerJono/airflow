@@ -1,9 +1,20 @@
 import requests
+from airflow.models import Variable
+
+FUNCTION_APP_API = Variable.get("function_app_api")
+FUNCTION_APP_API_KEY = Variable.get("function_app_api_key")
+
+base_url = FUNCTION_APP_API
+api_access_key_url = "?code=" + FUNCTION_APP_API_KEY
 
 
-def create_email_processing_job(base_url: str, email_id: str, start_time: str):
+def create_api_path(path: str):
+    return base_url + path + api_access_key_url
+
+
+def create_email_processing_job(email_id: str, start_time: str):
     response = requests.post(
-        base_url + "/api/new-email-received",
+        create_api_path("/api/new-email-received"),
         json={"msGraphEmailId": email_id, "startTime": start_time},
     )
     response.raise_for_status()  # will raise an exception if not 2xx
@@ -11,7 +22,6 @@ def create_email_processing_job(base_url: str, email_id: str, start_time: str):
 
 
 def set_cytora_job_status(
-    base_url: str,
     email_processing_job_id: str,
     status: str,
     job_type: str,
@@ -26,29 +36,28 @@ def set_cytora_job_status(
     if cytora_job_id:
         payload["cytoraJobID"] = cytora_job_id
 
-    response = requests.post(base_url + "/api/cytora-job-status", json=payload)
+    response = requests.post(create_api_path("/api/cytora-job-status"), json=payload)
     response.raise_for_status()
     return response
 
 
 def save_cytora_output_to_db(
-    base_url: str,
     endpoint: str,
     email_processing_job_id: str,
     extracted_output: str | dict[str, str],
 ):
     response = requests.post(
-        f"{base_url}{endpoint}",
+        create_api_path(endpoint),
         json={"id": email_processing_job_id, "output": extracted_output},
     )
     response.raise_for_status()  # will raise an exception if not 2xx
 
 
 def end_email_processing_job_in_db(
-    base_url: str, email_processing_job_id: str, end_time: str, overall_job_status: str
+    email_processing_job_id: str, end_time: str, overall_job_status: str
 ):
     response = requests.post(
-        base_url + "/api/email-processing-finished",
+        create_api_path("/api/email-processing-finished"),
         json={
             "id": email_processing_job_id,
             "endTime": end_time,

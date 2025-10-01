@@ -377,6 +377,8 @@ airflow:
       value: "${SHAREPOINT_LIBRARY_NAME}"
     - key: "function_app_api"
       value: "${FUNCTION_APP_API}"
+    - key: "function_app_api_key"
+      value: "${FUNCTION_APP_API_KEY}"
       
   variablesTemplates:
   
@@ -434,6 +436,11 @@ airflow:
       kind: configmap
       name: functionapp-connection-details
       key: base_url
+
+    FUNCTION_APP_API_KEY:
+      kind: secret
+      name: function-app-connection-key
+      key: function_app_access_key
 
   ## a list airflow pools to create
   ## [FAQ] https://github.com/airflow-helm/charts/blob/main/charts/airflow/docs/faq/dags/airflow-pools.md

@@ -67,7 +67,6 @@ from utilities.utils import bytes_to_megabytes
 NUM_RETRIES = 2
 RETRY_DELAY_MINS = 3
 
-FUNCTION_APP_API = Variable.get("function_app_api")
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +109,7 @@ def process_email_change_notifications():
                 TIMESTAMP_FORMAT_READABLE_MICROSECONDS
             )[:-3]
             response = create_email_processing_job(
-                base_url=FUNCTION_APP_API, email_id=email_id, start_time=start_time
+                email_id=email_id, start_time=start_time
             )
             job_id = response.json()["id"]
 
@@ -233,7 +232,6 @@ def process_email_change_notifications():
                 )
             except Exception as e:
                 set_cytora_job_status(
-                    base_url=FUNCTION_APP_API,
                     email_processing_job_id=email_processing_job_id,
                     status="Failed to start",
                     job_type="main",
@@ -242,7 +240,6 @@ def process_email_change_notifications():
 
             logger.info(f"Started cytora main job with id {main_job_id}")
             set_cytora_job_status(
-                base_url=FUNCTION_APP_API,
                 email_processing_job_id=email_processing_job_id,
                 status="In Progress",
                 job_type="main",
@@ -269,7 +266,6 @@ def process_email_change_notifications():
 
             if not output:
                 set_cytora_job_status(
-                    base_url=FUNCTION_APP_API,
                     email_processing_job_id=email_processing_job_id,
                     status="Failed - Status might be errored or under human review",
                     job_type="main",
@@ -292,7 +288,6 @@ def process_email_change_notifications():
                 )
             except Exception as e:
                 set_cytora_job_status(
-                    base_url=FUNCTION_APP_API,
                     email_processing_job_id=email_processing_job_id,
                     status="Failed to save full output to blob storage",
                     job_type="main",
@@ -314,7 +309,6 @@ def process_email_change_notifications():
                 f"Saving main job extracted output to DB: {email_processing_job_id}"
             )
             save_cytora_output_to_db(
-                base_url=FUNCTION_APP_API,
                 endpoint="/api/main-job-output",
                 email_processing_job_id=email_processing_job_id,
                 extracted_output=extracted_output,
@@ -332,7 +326,6 @@ def process_email_change_notifications():
                 )
             except Exception as e:
                 set_cytora_job_status(
-                    base_url=FUNCTION_APP_API,
                     email_processing_job_id=email_processing_job_id,
                     status="Failed to save extracted output to blob storage",
                     job_type="main",
@@ -343,7 +336,6 @@ def process_email_change_notifications():
                 )
 
             set_cytora_job_status(
-                base_url=FUNCTION_APP_API,
                 email_processing_job_id=email_processing_job_id,
                 status="Completed",
                 job_type="main",
@@ -402,7 +394,6 @@ def process_email_change_notifications():
                 )
             except Exception as e:
                 set_cytora_job_status(
-                    base_url=FUNCTION_APP_API,
                     email_processing_job_id=email_processing_job_id,
                     status="Failed to start",
                     job_type="sov",
@@ -410,7 +401,6 @@ def process_email_change_notifications():
                 raise AirflowException(f"Failed to start Cytora sov job: {e}")
 
             set_cytora_job_status(
-                base_url=FUNCTION_APP_API,
                 email_processing_job_id=email_processing_job_id,
                 status="In Progress",
                 job_type="sov",
@@ -438,7 +428,6 @@ def process_email_change_notifications():
 
             if not output:
                 set_cytora_job_status(
-                    base_url=FUNCTION_APP_API,
                     email_processing_job_id=email_processing_job_id,
                     status="Failed - Status might be errored or under human review",
                     job_type="sov",
@@ -460,7 +449,6 @@ def process_email_change_notifications():
                 )
             except Exception as e:
                 set_cytora_job_status(
-                    base_url=FUNCTION_APP_API,
                     email_processing_job_id=email_processing_job_id,
                     status="Failed to save full output to blob storage",
                     job_type="sov",
@@ -480,7 +468,6 @@ def process_email_change_notifications():
 
             if not extracted_output_dict:
                 set_cytora_job_status(
-                    base_url=FUNCTION_APP_API,
                     email_processing_job_id=email_processing_job_id,
                     status="Completed - no SOV fields found",
                     job_type="sov",
@@ -492,7 +479,6 @@ def process_email_change_notifications():
                 f"Saving sov job extracted output to DB: {email_processing_job_id}"
             )
             save_cytora_output_to_db(
-                base_url=FUNCTION_APP_API,
                 endpoint="/api/sov-job-output",
                 email_processing_job_id=email_processing_job_id,
                 extracted_output=extracted_output_dict,
@@ -510,7 +496,6 @@ def process_email_change_notifications():
                 )
             except Exception as e:
                 set_cytora_job_status(
-                    base_url=FUNCTION_APP_API,
                     email_processing_job_id=email_processing_job_id,
                     status="Failed to save extracted output to blob storage",
                     job_type="sov",
@@ -523,7 +508,6 @@ def process_email_change_notifications():
 
             logger.info(f"Extracted output for job {job_id} saved to blob storage.")
             set_cytora_job_status(
-                base_url=FUNCTION_APP_API,
                 email_processing_job_id=email_processing_job_id,
                 status="Completed",
                 job_type="sov",
@@ -692,7 +676,6 @@ def process_email_change_notifications():
                     )
                 except Exception as e:
                     set_cytora_job_status(
-                        base_url=FUNCTION_APP_API,
                         status="Failed to start",
                         email_processing_job_id=email_processing_job_id,
                         job_type="renewal",
@@ -713,7 +696,6 @@ def process_email_change_notifications():
                     )
                 except Exception as e:
                     set_cytora_job_status(
-                        base_url=FUNCTION_APP_API,
                         status="Failed to start",
                         email_processing_job_id=email_processing_job_id,
                         job_type="renewal",
@@ -727,7 +709,6 @@ def process_email_change_notifications():
                 )
 
             set_cytora_job_status(
-                base_url=FUNCTION_APP_API,
                 status="In Progress",
                 email_processing_job_id=email_processing_job_id,
                 job_type="renewal",
@@ -751,7 +732,6 @@ def process_email_change_notifications():
 
             if not output:
                 set_cytora_job_status(
-                    base_url=FUNCTION_APP_API,
                     status="Failed - Status may be errored or under human review",
                     email_processing_job_id=email_processing_job_id,
                     job_type="renewal",
@@ -771,7 +751,6 @@ def process_email_change_notifications():
                 )
             except Exception as e:
                 set_cytora_job_status(
-                    base_url=FUNCTION_APP_API,
                     email_processing_job_id=email_processing_job_id,
                     status="Failed to save full output to blob storage",
                     job_type="renewal",
@@ -789,7 +768,6 @@ def process_email_change_notifications():
                 f"Saving renewal job extracted output to DB: {email_processing_job_id}"
             )
             save_cytora_output_to_db(
-                base_url=FUNCTION_APP_API,
                 endpoint="/api/renewal-job-output",
                 email_processing_job_id=email_processing_job_id,
                 extracted_output=extracted_output,
@@ -805,7 +783,6 @@ def process_email_change_notifications():
                 )
             except Exception as e:
                 set_cytora_job_status(
-                    base_url=FUNCTION_APP_API,
                     email_processing_job_id=email_processing_job_id,
                     status="Failed to save extracted output to blob storage",
                     job_type="renewal",
@@ -817,7 +794,6 @@ def process_email_change_notifications():
             logger.info(f"Extracted output for job {job_id} saved to blob storage")
 
             set_cytora_job_status(
-                base_url=FUNCTION_APP_API,
                 email_processing_job_id=email_processing_job_id,
                 status="Completed",
                 job_type="renewal",
@@ -859,7 +835,6 @@ def process_email_change_notifications():
     @task(trigger_rule="all_done")
     def end_email_processing_job(email_processing_job: dict):
         end_email_processing_job_in_db(
-            base_url=FUNCTION_APP_API,
             overall_job_status="Completed",
             end_time=datetime.now(UTC).strftime(TIMESTAMP_FORMAT_READABLE_MICROSECONDS)[
                 :-3
