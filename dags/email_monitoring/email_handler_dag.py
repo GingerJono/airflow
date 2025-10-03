@@ -727,6 +727,7 @@ def process_email_change_notifications():
             """
             cytora_renewal = CytoraHook(CYTORA_SCHEMA_RENEWAL)
             email_processing_job_id = email_processing_job.get("id")
+            blob_folder = email_processing_job.get("blob_folder")
             job_id = email_processing_job.get("renewal_job_id")
             output = cytora_renewal.get_result_for_schema_job(job_id)
 
@@ -747,7 +748,9 @@ def process_email_change_notifications():
             )
             try:
                 full_output_key = save_cytora_output_to_blob_storage(
-                    output=output, key_prefix=RENEWAL_FULL_OUTPUTS_PREFIX, job_id=job_id
+                    output=output,
+                    key_prefix=f"{blob_folder}/{RENEWAL_FULL_OUTPUTS_PREFIX}",
+                    job_id=job_id,
                 )
             except Exception as e:
                 set_cytora_job_status(
@@ -778,7 +781,7 @@ def process_email_change_notifications():
             try:
                 extracted_output_key = save_cytora_output_to_blob_storage(
                     output=extracted_output,
-                    key_prefix=RENEWAL_EXTRACTED_OUTPUTS_PREFIX,
+                    key_prefix=f"{blob_folder}/{RENEWAL_EXTRACTED_OUTPUTS_PREFIX}",
                     job_id=job_id,
                 )
             except Exception as e:

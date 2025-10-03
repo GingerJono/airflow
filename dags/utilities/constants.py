@@ -7,7 +7,7 @@ MAIN_EXTRACTED_OUTPUTS_PREFIX = "extracted_output_main"
 SOV_FULL_OUTPUTS_PREFIX = "full_output_sov"
 SOV_EXTRACTED_OUTPUTS_PREFIX = "extracted_output_sov"
 RENEWAL_FULL_OUTPUTS_PREFIX = "full_output_renewal"
-RENEWAL_EXTRACTED_OUTPUTS_PREFIX = "extracted_output"
+RENEWAL_EXTRACTED_OUTPUTS_PREFIX = "extracted_output_renewal"
 
 GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME = "graph_message_eml_response_raw"
 CYTORA_MAIN_FILE_NAME = f"{GRAPH_EMAIL_EML_FILE_RESPONSE_FILENAME}_main"
