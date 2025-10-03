@@ -52,5 +52,5 @@ def extract_sov_from_flat_fields(fields: dict):
 
 def extract_renewal_outputs(output: dict):
     renewal_terms = get_field_value(output, "renewal_terms_comparison")
-    extracted_renewal_output = {"renewal_terms_comparison": renewal_terms}
+    extracted_renewal_output = {"OutputRenewalTermsComparison": renewal_terms}
     return extracted_renewal_output
