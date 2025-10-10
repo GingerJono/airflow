@@ -1,3 +1,5 @@
+from datetime import datetime
+
 DATETIME_FORMATS = [
     "%d/%m/%Y",
     "%Y-%m-%d",
@@ -20,17 +22,16 @@ def safe_stringify(v):
     return None if v is None else str(v)
 
 
-def safe_parse_date(v):
-    """Try to parse a string using known datetime formats; return date or None."""
-    if not v:
+def safe_parse_date(value):
+    if not value:
         return None
-
-    s = str(v).strip()
-    from datetime import datetime as dt
-
-    for fmt in DATETIME_FORMATS:
+    if isinstance(value, (list, dict)):
+        return None
+    s = str(value).strip()
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y"):
         try:
-            return dt.strptime(s[: len(fmt)], fmt).date()
-        except Exception:
+            return datetime.strptime(s, fmt).strftime("%Y-%m-%d")
+        except ValueError:
             continue
-    return None
+    # fallback: keep the original text so it isn't lost
+    return s
