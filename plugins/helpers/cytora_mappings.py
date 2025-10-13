@@ -1,4 +1,4 @@
-from helpers.utils import safe_parse_date, safe_stringify
+from helpers.utils import safe_parse_date, safe_parse_datetime, safe_stringify
 
 # Mapping of database column names (keys) to Cytora output fields.
 #
@@ -11,7 +11,7 @@ CYTORA_OUTPUT_FIELD_MAP_MAIN = {
     "EmailSubject": ("email_subject", safe_stringify),
     "EmailFrom": ("email_from", safe_stringify),
     "EmailTo": ("email_to", safe_stringify),
-    "EmailDataSent": ("email_timestamp", safe_stringify),
+    "EmailDateSent": ("email_timestamp", safe_parse_datetime),
     "EmailFileSizeInMB": (None, safe_stringify),
     "OutputInsuredName": ("insured_name", safe_stringify),
     "OutputInsuredDomicile": ("insured_domicile", safe_stringify),
