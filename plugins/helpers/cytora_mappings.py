@@ -23,7 +23,6 @@ CYTORA_OUTPUT_FIELD_MAP_MAIN = {
     "OutputReinsuredState": ("reinsured_state", safe_stringify),
     "OutputBrokerCompany": ("broker_company", safe_stringify),
     "OutputBrokerContact": ("broker_contact", safe_stringify),
-    "OutputPolicyType": ("policy_type", safe_stringify),
     "OutputUnderwriter": ("underwriter", safe_stringify),
     "OutputInceptionDate": ("inception_date", safe_parse_date),
     "OutputExpiryDate": ("expiry_date", safe_parse_date),
