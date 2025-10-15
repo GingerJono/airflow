@@ -14,7 +14,7 @@ CYTORA_OUTPUT_FIELD_MAP_MAIN = {
     "EmailDateSent": ("email_timestamp", safe_parse_datetime),
     "EmailFileSizeInMB": (None, safe_stringify),
     "OutputInsuredNameLookup": ("insured_name_lookup", safe_stringify),
-    "OutputInsuredNameNew": ("insured_name", safe_stringify),
+    "OutputInsuredNameNew": ("insured_name_new", safe_stringify),
     "OutputInsuredDomicile": ("insured_domicile", safe_stringify),
     "OutputInsuredState": ("insured_state", safe_stringify),
     "OutputReinsuredNameLookup": ("reinsured_name_lookup", safe_stringify),
