@@ -54,6 +54,7 @@ def safe_parse_datetime(value):
             continue
     return s
 
+
 def safe_intify(value):
     if value is None:
         return None
@@ -61,7 +62,8 @@ def safe_intify(value):
         return int(str(value).replace(",", "").strip())
     except (ValueError, TypeError):
         return None
-    
+
+
 def safe_decimalify(value):
     if value is None:
         return None
