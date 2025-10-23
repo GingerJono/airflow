@@ -1,5 +1,4 @@
 from datetime import datetime
-from decimal import Decimal, InvalidOperation
 
 DATETIME_FORMATS = [
     "%d/%m/%Y",
