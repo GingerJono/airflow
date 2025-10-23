@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 DATETIME_FORMATS = [
     "%d/%m/%Y",
@@ -52,3 +53,19 @@ def safe_parse_datetime(value):
         except ValueError:
             continue
     return s
+
+def safe_intify(value):
+    if value is None:
+        return None
+    try:
+        return int(str(value).replace(",", "").strip())
+    except (ValueError, TypeError):
+        return None
+    
+def safe_decimalify(value):
+    if value is None:
+        return None
+    try:
+        return float(str(value).replace(",", "").strip())
+    except ValueError:
+        return None

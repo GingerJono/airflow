@@ -1,4 +1,10 @@
-from helpers.utils import safe_parse_date, safe_parse_datetime, safe_stringify
+from helpers.utils import (
+    safe_decimalify,
+    safe_intify,
+    safe_parse_date,
+    safe_parse_datetime,
+    safe_stringify,
+)
 
 # Mapping of database column names (keys) to Cytora output fields.
 #
@@ -30,4 +36,16 @@ CYTORA_OUTPUT_FIELD_MAP_MAIN = {
     "OutputAdditionalParties": ("additional_parties", safe_stringify),
     "OutputSubmissionSummary": ("submission_summary", safe_stringify),
     "OutputRenewedFrom": ("renewed_from", safe_stringify),
+    
+    "OutputLimit": ("limit", safe_decimalify),
+    "OutputXS": ("xs", safe_decimalify),
+    "OutputLimitCcy": ("limit_ccy", safe_stringify),
+    "OutputXSCcy": ("xs_ccy", safe_stringify),
+    "OutputSubmissionTIV": ("submission_tiv", safe_decimalify),
+    "OutputNumLocations": ("num_locations", safe_intify),
+    "OutputWhatsMissing": ("whats_missing", safe_stringify),
+    "OutputOccClass": ("occ_class", safe_stringify),
+    "OutputOccType": ("occ_type", safe_stringify),
+    "OutputContractType": ("contract_type", safe_stringify),
+    "OutputPolicyType": ("policy_type", safe_stringify)
 }
