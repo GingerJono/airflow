@@ -19,13 +19,10 @@ def parse_programme_ref_and_year_of_account(
 
 
 def check_is_renewal(output: dict) -> bool:
-    val = get_field_value(output, "new_vs_renewal")
+    val = get_field_value(output, "renewed_from")
     if not val:
         return False
-    return str(val).strip().lower() in {
-        "renewal",
-        "renewed",
-        "is_renewal",
-        "yes",
-        "true",
-    }
+    val_str = str(val).strip()
+    if val_str.lower() == "notrenewal":
+        return False
+    return ";" in val_str
