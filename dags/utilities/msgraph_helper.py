@@ -140,3 +140,46 @@ def send_email(
         headers={"content-type": "application/json"},
         data=request_body,
     )
+
+
+def get_email_metadata(email_id: str, mailbox: str) -> dict:
+    """
+    Retrieves basic metadata for an email (subject, from, receivedDateTime)
+    from Microsoft Graph.
+    """
+    logger.info(
+        "Retrieving email metadata for ID %s from mailbox %s", email_id, mailbox
+    )
+
+    try:
+        result = _run_msgraph_query(url=f"/users/{mailbox}/messages/{email_id}")
+
+        if not isinstance(result, dict):
+            logger.warning(
+                "Unexpected response type for email %s: %s", email_id, type(result)
+            )
+            return {}
+
+        subject = result.get("subject")
+        sender = result.get("from", {}).get("emailAddress", {}).get("address")
+        received = result.get("receivedDateTime")
+
+        logger.debug(
+            "Extracted metadata for %s -> subject: %s | sender: %s | received: %s",
+            email_id,
+            subject,
+            sender,
+            received,
+        )
+
+        return {
+            "subject": subject,
+            "from": sender,
+            "receivedDateTime": received,
+        }
+
+    except Exception as e:
+        logger.warning(
+            "Failed to retrieve email metadata for %s: %s", email_id, e, exc_info=True
+        )
+        return {}

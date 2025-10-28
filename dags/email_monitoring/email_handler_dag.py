@@ -59,6 +59,7 @@ from utilities.database_helper import (
     set_cytora_job_status,
 )
 from utilities.msgraph_helper import (
+    get_email_metadata,
     get_eml_file_from_email_id,
 )
 from utilities.sharepoint_helper import find_expiring_slip
@@ -161,6 +162,16 @@ def process_email_change_notifications():
 
         logger.info("Email eml file saved to blob storage: %s", email_blob_path)
 
+        try:
+            metadata = get_email_metadata(email_id=email_id, mailbox=mailbox)
+            subject = (
+                metadata.get("subject", "untitled").replace("/", "_").replace("\\", "_")
+            )
+            email_processing_job["email_subject"] = subject
+            logger.info("Retrieved email subject for %s: %s", email_id, subject)
+        except Exception as e:
+            logger.warning("Failed to retrieve email metadata for %s: %s", email_id, e)
+
         return email_processing_job
 
     @task
@@ -222,12 +233,13 @@ def process_email_change_notifications():
             cytora_main = CytoraHook(CYTORA_SCHEMA_MAIN)
             email_processing_job_id = email_processing_job.get("id")
             email_eml_file_id = email_processing_job.get("email_eml_file_id")
+            title_fragment = email_processing_job.get("email_subject", "no_title")[:60]
 
             logger.info("Starting cytora main flow...")
             try:
                 main_job_id = start_cytora_job(
                     cytora_instance=cytora_main,
-                    file_names=[CYTORA_MAIN_FILE_NAME],
+                    file_names=[f"{CYTORA_MAIN_FILE_NAME}_{title_fragment}"],
                     file_ids=[email_eml_file_id],
                 )
             except Exception as e:
@@ -387,9 +399,12 @@ def process_email_change_notifications():
             file_id = email_processing_job.get("email_eml_file_id")
             logger.info("Starting cytora sov flow...")
             try:
+                title_fragment = email_processing_job.get("email_subject", "no_title")[
+                    :60
+                ]
                 sov_job_id = start_cytora_job(
                     cytora_instance=cytora_sov,
-                    file_names=[CYTORA_SOV_FILE_NAME],
+                    file_names=[f"{CYTORA_SOV_FILE_NAME}_{title_fragment}"],
                     file_ids=[file_id],
                 )
             except Exception as e:
@@ -644,6 +659,9 @@ def process_email_change_notifications():
                 slip_blob_name = slip_info.get("slip_blob_name")
                 slip_name = slip_info.get("slip_name")
                 slip_media_type = guess_media_type(slip_name or "document.pdf")
+                title_fragment = email_processing_job.get("email_subject", "no_title")[
+                    :60
+                ]
 
                 logger.info("Uploading slip to Cytora...")
                 status, slip_file_upload_id = upload_stream_to_cytora(
@@ -670,8 +688,8 @@ def process_email_change_notifications():
                         cytora_instance=cytora_renewal,
                         file_ids=[email_file_id, slip_file_id],
                         file_names=[
-                            CYTORA_RENEWAL_FILE_NAME,
-                            CYTORA_RENEWAL_SLIP_FILE_NAME,
+                            f"{CYTORA_RENEWAL_FILE_NAME}_{title_fragment}",
+                            f"{CYTORA_RENEWAL_FILE_NAME}_{title_fragment}",
                         ],
                     )
                 except Exception as e:
@@ -692,7 +710,7 @@ def process_email_change_notifications():
                     renewal_job_id = start_cytora_job(
                         cytora_instance=cytora_renewal,
                         file_ids=[email_file_id],
-                        file_names=[CYTORA_RENEWAL_FILE_NAME],
+                        file_names=[f"{CYTORA_RENEWAL_FILE_NAME}_{title_fragment}"],
                     )
                 except Exception as e:
                     set_cytora_job_status(
