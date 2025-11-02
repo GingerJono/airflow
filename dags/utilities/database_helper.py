@@ -4,7 +4,7 @@ from airflow.models import Variable
 FUNCTION_APP_API = Variable.get("function_app_api")
 FUNCTION_APP_API_KEY = Variable.get("function_app_api_key")
 # manual hack to make DEV work while pointing to Prod. 2025-11-02 23:36 by Jono
-FUNCTION_APP_API = "https://dev-dalint-func.azurewebsites.net"
+FUNCTION_APP_API = "https://prd-dalint-func.azurewebsites.net"
 FUNCTION_APP_API_KEY = "CWeRJaVFd8KpQM7jV8DeFvPN6h-J542bRvWsXeZHwwNtAzFuDEesZQ=="
 
 base_url = FUNCTION_APP_API
