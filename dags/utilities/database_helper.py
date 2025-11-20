@@ -4,13 +4,11 @@ from airflow.models import Variable
 FUNCTION_APP_API = Variable.get("function_app_api")
 FUNCTION_APP_API_KEY = Variable.get("function_app_api_key")
 
-base_url = FUNCTION_APP_API
-api_access_key_url = "?code=" + FUNCTION_APP_API_KEY
 function_app_request_timeout = 60
 
 
 def create_api_path(path: str):
-    return base_url + path + api_access_key_url
+    return FUNCTION_APP_API + path + "?code=" + FUNCTION_APP_API_KEY
 
 
 def create_email_processing_job(email_id: str, start_time: str):
